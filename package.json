@@ -17,6 +17,7 @@
     "cf:dev": "wrangler dev --port 8787",
     "cf:types": "wrangler types",
     "cf:check": "tsc -p tsconfig.worker.json",
+    "check": "npm run cf:check && npm test && npm run build",
     "cf:deploy": "npm run build && npm run cf:check && wrangler deploy",
     "cf:test": "node cloudflare/verify-live.mjs",
     "cf:smoke": "node cloudflare/smoke.mjs"
