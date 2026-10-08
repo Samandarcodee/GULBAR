@@ -78,5 +78,23 @@ test('owner adds a shop, merchant changes password, adds a flower and processes 
   const owner = await (await request.post('/api/auth/login', { data: { login: 'e2e-admin', password: 'Owner-Personal-Password' } })).json();
   const closed = await request.patch(`/api/admin/shops/${shop.id}/settings`, { headers: { Authorization: `Bearer ${owner.token}` }, data: { shop: { ...shop, active: false }, phone: '+998900000000', telegramChatId: '123456789' } });
   expect(closed.status()).toBe(200);
+  // the owner deletes the test shop from the panel: the button stays off until the name is typed
+  await page.goto('/admin');
+  await page.getByLabel('Login', { exact: true }).fill('e2e-admin');
+  await page.getByLabel('Parol', { exact: true }).fill('Owner-Personal-Password');
+  await page.getByRole('button', { name: 'Kirish', exact: true }).click();
+  const card = page.locator('.adm-shop', { hasText: 'Panel Test Flowers' });
+  await card.getByRole('button', { name: /O‘chirish/ }).click();
+  const confirm = page.getByRole('dialog', { name: 'Do‘konni o‘chirish' });
+  await expect(confirm.getByRole('button', { name: 'Do‘konni o‘chirish' })).toBeDisabled();
+  await confirm.getByLabel('Do‘kon nomi', { exact: true }).fill('Panel Test');
+  await expect(confirm.getByRole('button', { name: 'Do‘konni o‘chirish' })).toBeDisabled();
+  await confirm.getByLabel('Do‘kon nomi', { exact: true }).fill('Panel Test Flowers');
+  await confirm.getByRole('button', { name: 'Do‘konni o‘chirish' }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'o‘chirildi' })).toBeVisible();
+  await expect(page.locator('.admin-shop-list')).not.toContainText('Panel Test Flowers');
+  const after = await (await request.get('/api/catalog')).json();
+  expect(after.shops.some((x: any) => x.id === shop.id)).toBe(false);
+  expect((await request.post('/api/auth/login', { data: { login: 'panel.test', password: 'Merchant-Personal-Password' } })).status()).toBe(401);
   expect(errors).toEqual([]);
 });

@@ -43,6 +43,8 @@ const password = z.string().min(12, 'Parol kamida 12 belgi bo‘lsin.').max(128)
 const newShop = z.object({ shop: shopSchema, login: loginSchema.shape.login, password,
   phone: z.string().regex(/^\+998\d{9}$/, 'Telefon: +998 va 9 ta raqam.'), telegramChatId: z.string().regex(/^\d{1,16}$|^$/, 'Telegram ID raqamlardan iborat bo‘lsin.').default('') });
 function fail(message, status = 400) { return { status, data: { error: message } }; }
+// orders the shop still has to fulfil: deleting the shop is refused while any exist
+const OPEN_ORDERS_SQL = "SELECT COUNT(*) AS n FROM orders WHERE json_extract(data,'$.shopId')=? AND json_extract(data,'$.status') IN ('pending','accepted','delivering')";
 export async function accountRequest(store, path, method, body, token, adminAuthorized = false, hooks = {}) {
   if (path === '/auth/login' && method === 'POST') {
     const parsed = loginSchema.safeParse(body);
@@ -118,6 +120,28 @@ export async function accountRequest(store, path, method, body, token, adminAuth
       ]);
     } catch { return fail('Bu login yoki do‘kon ID allaqachon mavjud.', 409); }
     return { status: 201, data: { ...shop, login, phone, telegramChatId, accountEnabled: true } };
+  }
+  const removal = /^\/admin\/shops\/([a-z0-9-]{2,40})$/.exec(path);
+  if (removal && method === 'DELETE') {
+    const id = removal[1];
+    if (!await store.first('SELECT id FROM shops WHERE id=?', [id])) return fail('Do‘kon topilmadi.', 404);
+    const open = await store.first(OPEN_ORDERS_SQL, [id]);
+    if (Number(open?.n) > 0) return fail(`Do‘konda ${open.n} ta tugallanmagan buyurtma bor. Avval ularni yetkazing yoki bekor qiling, keyin o‘chiring.`, 409);
+    try {
+      await store.batch([
+        // atomic guard: a buyer's order that slipped in since the check above makes this insert fail, and the whole batch rolls back
+        ["INSERT INTO metadata(key,value) SELECT 'delete-guard', NULL WHERE EXISTS (" + OPEN_ORDERS_SQL.replace('COUNT(*) AS n', '1') + ")", [id]],
+        ['DELETE FROM reviews WHERE shop_id=?', [id]],
+        ['DELETE FROM images WHERE shop_id=?', [id]],
+        ['DELETE FROM products WHERE shop_id=?', [id]],
+        ['DELETE FROM sessions WHERE account_id IN (SELECT id FROM accounts WHERE shop_id=?)', [id]],
+        ['DELETE FROM accounts WHERE shop_id=?', [id]],
+        ['DELETE FROM shop_private WHERE shop_id=?', [id]],
+        ['DELETE FROM shops WHERE id=?', [id]],
+      ]);
+    } catch { return fail('Do‘konni o‘chirib bo‘lmadi: yangi buyurtma tushgan bo‘lishi mumkin. Qayta urinib ko‘ring.', 409); }
+    // past orders stay as the buyers' history (they carry the shop name); only the shop and everything it owned is removed
+    return { status: 200, data: { ok: true, id } };
   }
   const create = /^\/admin\/shops\/([a-z0-9-]{2,40})\/account$/.exec(path);
   if (create && method === 'POST') {

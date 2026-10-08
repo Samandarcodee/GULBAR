@@ -121,3 +121,9 @@
   .map-box { height: 46vh; }
 }
 @media (prefers-reduced-motion: reduce) { .faq summary svg, .method-toggle button { transition: none; } }
+
+/* admin: delete a shop */
+.delete-shop p { font-size: 14px; line-height: 1.6; margin: 0 0 12px; }
+.delete-shop .field { margin: 14px 0; }
+.delete-shop .secondary { margin-top: 8px; }
+.primary.danger:disabled { opacity: .45; cursor: not-allowed; }

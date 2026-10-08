@@ -89,4 +89,27 @@ for (let i = 0; i < 6; i++) await call('/support', 'POST', { kind: 'question', m
 assert.equal((await call('/support', 'POST', { kind: 'question', message: 'Yana bitta savol' })).status, 429);
 assert.equal((await call('/admin/support')).status, 401);
 
+// deleting a shop (admin only): refused while an order is open, then the shop and its login disappear
+const adminToken = process.env.ADMIN_TOKEN || (() => { try { return (readFileSync(new URL('../.dev.vars', import.meta.url), 'utf8').match(/^ADMIN_TOKEN=(.*)$/m) || [])[1]?.replace(/^"|"$/g, '') || ''; } catch { return ''; } })();
+if (adminToken) {
+  assert.equal((await call('/admin/shops/lola', 'DELETE')).status, 401, 'only an admin may delete a shop');
+  const open = await order({ method: 'delivery', when: 'asap' });
+  assert.equal(open.status, 201, JSON.stringify(open.data));
+  const refused = await call('/admin/shops/lola', 'DELETE', undefined, user, adminToken);
+  assert.equal(refused.status, 409, JSON.stringify(refused.data));
+  assert.ok((await call('/catalog')).data.shops.some(s => s.id === 'lola'), 'a refused delete removes nothing');
+  assert.equal((await call(`/orders/${open.data.id}/cancel`, 'POST')).status, 200);
+
+  const doomed = { id: 'smoke-delete', name: 'Smoke Delete', subtitle: 'Test flowers', address: 'Urganch test address', deliveryFee: 25000, deliveryTime: '30–60 daqiqa', color: '#edf3ee', initials: 'SD', active: true };
+  const made = await call('/admin/onboard', 'POST', { shop: doomed, login: 'smoke.delete', password: 'Temporary-Password-123', phone: '+998901234567', telegramChatId: '123456789' }, user, adminToken);
+  assert.equal(made.status, 201, JSON.stringify(made.data));
+  const session = await call('/auth/login', 'POST', { login: 'smoke.delete', password: 'Temporary-Password-123' });
+  assert.equal(session.status, 200, JSON.stringify(session.data));
+  const removed = await call('/admin/shops/smoke-delete', 'DELETE', undefined, user, adminToken);
+  assert.equal(removed.status, 200, JSON.stringify(removed.data));
+  assert.equal((await call('/admin/shops/smoke-delete', 'DELETE', undefined, user, adminToken)).status, 404);
+  assert.equal((await call('/auth/me', 'GET', undefined, user, session.data.token)).status, 401, 'the deleted shop owner is signed out');
+  assert.equal((await call('/auth/login', 'POST', { login: 'smoke.delete', password: 'Temporary-Password-123' })).status, 401);
+} else console.log('skipped: shop deletion (no ADMIN_TOKEN)');
+
 console.log('worker smoke OK');

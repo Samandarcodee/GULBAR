@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { motion } from 'motion/react';
-import { ArrowLeft, Check, Circle, Copy, Eye, EyeOff, LogOut, Plus, RefreshCw, Search, Sparkles, Store } from 'lucide-react';
+import { ArrowLeft, Check, Circle, Copy, Eye, EyeOff, LogOut, Plus, RefreshCw, Search, Sparkles, Store, Trash2 } from 'lucide-react';
 import type { AccountAuth, AdminShop } from '../types';
 import { api, ApiError, money } from '../lib/api';
 import { Dialog } from './Dialog';
@@ -91,6 +91,8 @@ export function Admin({ back, reload, demo }: { back: () => void; reload: () => 
   const [shops, setShops] = useState<AdminShop[]>([]);
   const [edit, setEdit] = useState<Partial<AdminShop> | null>(null);
   const [manage, setManage] = useState<AdminShop | null>(null);
+  const [removing, setRemoving] = useState<AdminShop | null>(null);
+  const [typed, setTyped] = useState('');
   const [access, setAccess] = useState<{ login: string; password: string } | null>(null);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -102,7 +104,7 @@ export function Admin({ back, reload, demo }: { back: () => void; reload: () => 
   async function load(key = auth?.token) {
     if (!key) return; const current = session.current;
     try { const rows = await api<AdminShop[]>('/admin/workspace', {}, key); if (session.current === current) { setShops(rows); setError(''); } }
-    catch (e) { if (session.current !== current) return; if (e instanceof ApiError && e.status === 401) { setAuth(null); setShops([]); setEdit(null); setManage(null); setAccess(null); } setError((e as Error).message); }
+    catch (e) { if (session.current !== current) return; if (e instanceof ApiError && e.status === 401) { setAuth(null); setShops([]); setEdit(null); setManage(null); setAccess(null); setRemoving(null); } setError((e as Error).message); }
   }
   function login(result: AccountAuth) { setAuth(result); load(result.token); }
   function logout() { if (auth) void api('/auth/logout', { method: 'POST' }, auth.token).catch(() => {}); session.current++; setAuth(null); setShops([]); setAccess(null); setError(''); setNotice(''); }
@@ -141,6 +143,15 @@ export function Admin({ back, reload, demo }: { back: () => void; reload: () => 
     try { await api(`/admin/shops/${manage.id}/account`, { method: 'PATCH', body: JSON.stringify({ enabled: data.get('enabled') === 'on', ...(password ? { password } : {}) }) }, auth.token); if (password) setAccess({ login: manage.login, password }); setManage(null); await load(); setNotice('Hisob yangilandi. Avvalgi sessiyalar yopildi.'); }
     catch (e) { setError((e as Error).message); } finally { setBusy(false); }
   }
+  async function remove() {
+    if (!auth || !removing || busy || typed.trim() !== removing.name) return;
+    setBusy(true); setError('');
+    try {
+      await api(`/admin/shops/${removing.id}`, { method: 'DELETE' }, auth.token);
+      setNotice(`«${removing.name}» o‘chirildi.`); setRemoving(null); setTyped('');
+      await load(); reload();
+    } catch (e) { setError((e as Error).message); } finally { setBusy(false); }
+  }
   async function copyAccess() { if (!access) return; try { await navigator.clipboard.writeText(`GulBar do‘kon paneli: ${location.origin}/merchant\nLogin: ${access.login}\nVaqtinchalik parol: ${access.password}\nBirinchi kirishda parolni almashtiring.`); setNotice('Kirish ma’lumotlari nusxalandi.'); } catch { setError('Nusxalab bo‘lmadi. Login va parolni qo‘lda yozib oling.'); } }
 
   const ready = (s: AdminShop) => s.active && steps(s).every(x => x.ok);
@@ -176,13 +187,25 @@ export function Admin({ back, reload, demo }: { back: () => void; reload: () => 
           <ul className="adm-steps" aria-label="Tayyorlik">{list.map(x => <li key={x.label} className={x.ok ? 'ok' : ''}>{x.ok ? <Check size={14} strokeWidth={2.4} /> : <Circle size={11} />}{x.label}</li>)}</ul>
           <p className={`adm-next${isReady ? ' done' : ''}`}>{isReady ? 'Tayyor — buyurtma qabul qila oladi.' : !s.active && !next ? 'Hamma narsa tayyor. Do‘konni katalogda oching.' : next ? `Keyingi qadam: ${next.todo}.` : ''}</p>
           <dl><div><dt>Login</dt><dd>{s.login || 'Eski kalit hisobi'}{s.login && !s.accountEnabled && ' · bloklangan'}</dd></div><div><dt>Yetkazish</dt><dd>{money(s.deliveryFee)} · {s.deliveryTime}</dd></div></dl>
-          <div className="order-actions"><button className="secondary" onClick={() => { setError(''); setEdit(s); }}>Do‘konni tahrirlash</button>{s.login && <button className="secondary" onClick={() => { setError(''); setManage(s); }}>Login va parol</button>}</div>
+          <div className="order-actions"><button className="secondary" onClick={() => { setError(''); setEdit(s); }}>Do‘konni tahrirlash</button>{s.login && <button className="secondary" onClick={() => { setError(''); setManage(s); }}>Login va parol</button>}<button className="secondary danger" onClick={() => { setError(''); setNotice(''); setTyped(''); setRemoving(s); }}><Trash2 size={15} aria-hidden="true" /> O‘chirish</button></div>
         </motion.article>;
       })}</div>
       {!visible.length && <div className="empty"><Store size={38} /><h3>{shops.length ? 'Do‘kon topilmadi' : 'Hali do‘kon yo‘q'}</h3><p>{shops.length ? 'Filtr yoki qidiruvni o‘zgartiring.' : '«Yangi do‘kon» tugmasi bilan birinchi do‘konni qo‘shing.'}</p></div>}
       <div className="admin-process"><h2>Do‘konni ulash tartibi</h2><ol><li>Do‘kon va login hisobini yarating.</li><li>Panel havolasi, login va vaqtinchalik parolni egasiga bering.</li><li>Egasi parolni almashtirib, gullarini qo‘shadi.</li><li>Do‘konni oching — xaridor buyurtmasi uning Telegramiga tushadi.</li></ol></div>
-    </>}{error && !edit && !manage && <p className="error-banner" role="alert">{error}</p>}{notice && <p className="merchant-notice" role="status">{notice}</p>}
+    </>}{error && !edit && !manage && !removing && <p className="error-banner" role="alert">{error}</p>}{notice && <p className="merchant-notice" role="status">{notice}</p>}
     {edit && <Dialog title={edit.id ? 'Do‘konni tahrirlash' : 'Yangi do‘kon va hisob'} onClose={() => { if (!busy) setEdit(null); }}><ShopForm edit={edit} busy={busy} error={error} onSubmit={save} onClose={() => setEdit(null)} /></Dialog>}
+    {removing && <Dialog title="Do‘konni o‘chirish" onClose={() => { if (!busy) setRemoving(null); }}>
+      <form className="delete-shop" onSubmit={e => { e.preventDefault(); void remove(); }}>
+        <p><b>{removing.name}</b> butunlay o‘chiriladi: do‘kon, uning {removing.products ?? 0} ta guli, rasmlari, sharhlari va egasining login hisobi. Buni qaytarib bo‘lmaydi.</p>
+        <p className="field-help">Oldingi buyurtmalar xaridorlarda tarix sifatida qoladi. Tugallanmagan buyurtma bo‘lsa, o‘chirish rad etiladi.</p>
+        <label className="field">Tasdiqlash uchun do‘kon nomini yozing: <b>{removing.name}</b>
+          <input value={typed} onChange={e => setTyped(e.target.value)} autoComplete="off" autoCapitalize="off" aria-label="Do‘kon nomi" />
+        </label>
+        {error && <p role="alert" className="error-banner">{error}</p>}
+        <button className="primary full danger" disabled={busy || typed.trim() !== removing.name}>{busy ? 'O‘chirilmoqda…' : 'Do‘konni o‘chirish'}</button>
+        <button type="button" className="secondary full" disabled={busy} onClick={() => setRemoving(null)}>Bekor qilish</button>
+      </form>
+    </Dialog>}
     {manage && <Dialog title={`${manage.login} hisobi`} onClose={() => { if (!busy) setManage(null); }}><form className="product-form" onSubmit={resetAccount}><label className="field">Yangi vaqtinchalik parol<input name="password" type="password" minLength={12} maxLength={128} autoComplete="new-password" /></label><p className="field-help">Bo‘sh qoldirsangiz parol o‘zgarmaydi. Yangi parol qo‘yilganda egasi birinchi kirishda uni almashtiradi.</p><label className="merchant-checkbox"><input name="enabled" type="checkbox" defaultChecked={manage.accountEnabled} /> Login hisobi faol</label><p className="field-help">Saqlash avvalgi kirish sessiyalarini yopadi. Hisobni bloklash yangi kirishni ham to‘xtatadi.</p>{error && <p role="alert" className="error-banner">{error}</p>}<button className="primary full" disabled={busy}>Hisobni saqlash</button></form></Dialog>}
     {access && <Dialog title="Do‘kon egasiga beriladigan ma’lumotlar" onClose={() => setAccess(null)}><p className="field-help">Parol qayta ko‘rsatilmaydi. Hozir nusxalab, egasiga xavfsiz yo‘l bilan bering.</p><label className="field">Panel havolasi<input readOnly value={`${location.origin}/merchant`} /></label><label className="field">Login<input readOnly value={access.login} /></label><label className="field">Vaqtinchalik parol<input readOnly type="password" value={access.password} /></label><button className="primary full" onClick={copyAccess}><Copy size={16} /> Kirish ma’lumotlarini nusxalash</button>{notice && <p role="status" className="merchant-notice">{notice}</p>}<button className="text-button" onClick={() => setAccess(null)}>Ma’lumotlarni oldim</button></Dialog>}
   </main>;

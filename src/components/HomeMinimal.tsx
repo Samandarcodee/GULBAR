@@ -3,7 +3,7 @@ import { AnimatePresence, MotionConfig, motion, useReducedMotion } from 'motion/
 import { Check, Flower2, Heart, Plus, Search, SlidersHorizontal, X } from 'lucide-react';
 import type { CartItem, Catalog, Product, Shop } from '../types';
 import { haptic, money } from '../lib/api';
-import { sampleTint, type Tint } from '../lib/tint';
+import type { Tint } from '../lib/tint';
 import { useFly } from './Fly';
 import { RatingLine } from './Reviews';
 import { shopStatus, useNow } from '../lib/hours-ui';
@@ -101,7 +101,7 @@ export function Item({ product, shop, tint, favorite, inCart, open, add, toggleF
     <div className="gm-photo" ref={photo}>
       <button className="gm-photo-btn" onClick={open} aria-label={`${product.name} haqida`}>
         {failed ? <Flower2 className="gm-missing" size={36} strokeWidth={1.1} aria-hidden="true" />
-          : <img className={loaded ? 'in' : ''} src={product.image} alt={product.name} loading="lazy" onLoad={() => setLoaded(true)} onError={() => setFailed(true)} />}
+          : <img className={loaded ? 'in' : ''} src={product.image} alt={product.name} loading="lazy" decoding="async" onLoad={() => setLoaded(true)} onError={() => setFailed(true)} />}
       </button>
       <button className={`gm-fav${favorite ? ' on' : ''}`} onClick={toggleFavorite} aria-label={`${product.name}: sevimlilar`} aria-pressed={favorite}>
         <motion.span animate={favorite ? { scale: [1, 1.4, 1] } : { scale: 1 }} transition={{ duration: 0.45, ease }}><Heart size={15} fill={favorite ? 'currentColor' : 'none'} strokeWidth={1.8} /></motion.span>
@@ -133,12 +133,6 @@ export function HomeMinimal({ catalog, favorites, cart, shopFilter, setShopFilte
   const patch = (part: Partial<HomeFilters>) => setFilters({ ...filters, ...part });
   const [sheet, setSheet] = useState(false);
   const { fly, layer } = useFly();
-  const [tints, setTints] = useState<Record<string, Tint>>({});
-  useEffect(() => {
-    let live = true;
-    products.forEach(p => sampleTint(p.image).then(t => { if (live && t) setTints(m => m[p.id]?.h === t.h ? m : { ...m, [p.id]: t }); }));
-    return () => { live = false; };
-  }, [products.map(p => p.image).join()]);
 
   const needle = plain(search.trim());
   const tier = budgets.find(b => b.id === budget);
@@ -196,7 +190,7 @@ export function HomeMinimal({ catalog, favorites, cart, shopFilter, setShopFilte
 
     {products.length === 0 ? <p className="gm-empty">Hozircha gullar qo‘shilmagan.</p> : <ul className="gm-grid" id="catalog">
       <AnimatePresence mode="popLayout" initial>
-        {list.map(p => <Item key={p.id} product={p} shop={shops.find(s => s.id === p.shopId)} tint={tints[p.id]}
+        {list.map(p => <Item key={p.id} product={p} shop={shops.find(s => s.id === p.shopId)}
           favorite={favorites.includes(p.id)} inCart={cart.some(c => c.productId === p.id)} open={() => open(p)} add={() => add(p)} toggleFavorite={() => toggleFavorite(p.id)} fly={fly} openShop={openShop ? () => openShop(p.shopId) : undefined} />)}
       </AnimatePresence>
     </ul>}

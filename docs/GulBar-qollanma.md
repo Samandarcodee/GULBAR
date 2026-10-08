@@ -104,6 +104,7 @@ Istalgan vaqtda (yetkazilgunga qadar): `Bekor qilindi`.
 - **Tayyorlik ko'rsatkichi:** har bir do'kon kartasida 4 qadam (telefon, Telegram, login, gullar) va «Keyingi qadam» yozuvi. Hammasi tayyor bo'lsa «Buyurtma qabul qila oladi».
 - **Filtr va qidiruv:** Hammasi / Tayyor emas / Tayyor.
 - **Hisobni boshqarish:** parolni tiklash, loginni bloklash (sessiyalar yopiladi).
+- **Do'konni o'chirish:** do'kon kartasidagi «O'chirish» tugmasi. Tasdiqlash uchun do'kon nomini yozish kerak. Do'kon, gullari, rasmlari, sharhlari va egasining logini o'chadi, egasi tizimdan chiqib ketadi. Oldingi buyurtmalar xaridorlarda tarix sifatida qoladi. Tugallanmagan buyurtma (kutilmoqda, qabul qilindi, yo'lda) bo'lsa o'chirish rad etiladi. Qaytarib bo'lmaydi; vaqtincha yopish uchun «Do'konni katalogda ochish» belgisini olib tashlang.
 
 **Slaydga:** admin panelining ekrani va "Do'konni ulash — 4 qadam".
 
