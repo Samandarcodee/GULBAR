@@ -1,0 +1,15 @@
+node_modules/
+dist/
+.env
+data/
+*.tsbuildinfo
+test-results/
+.wrangler/
+.dev.vars
+.dev.vars.*
+.cloudflare-secrets.json
+.cloudflare-demo-access.txt
+.gulbar-onboarding.json
+.gulbar-admin-login.json
+.gulbar-admin-access.txt
+.gulbar-migration/

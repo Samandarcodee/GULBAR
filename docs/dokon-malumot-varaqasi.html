@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<title>GulBar — do‘kon ma’lumotlari varaqasi</title>
+<style>
+  @page { size: A4; margin: 14mm 15mm; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 11.5pt/1.4 "Segoe UI", Arial, sans-serif; color: #171614; }
+  h1 { margin: 0; font: 700 22pt/1.1 Georgia, "Times New Roman", serif; letter-spacing: -.01em; }
+  h2 { margin: 14px 0 6px; font-size: 10.5pt; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; color: #5c5650; }
+  .top { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; padding-bottom: 8px; border-bottom: 2px solid #171614; }
+  .top small { font-size: 10pt; color: #5c5650; text-align: right; }
+  .lead { margin: 8px 0 2px; font-size: 10.5pt; color: #5c5650; }
+  .row { display: flex; align-items: flex-end; gap: 10px; margin: 9px 0; }
+  .row label { flex: 0 0 auto; font-weight: 600; }
+  .row .line { flex: 1; min-height: 20px; border-bottom: 1px solid #8b8782; }
+  .row.two > div { flex: 1; display: flex; align-items: flex-end; gap: 8px; }
+  .hint { margin: -4px 0 6px; font-size: 9.5pt; color: #6a625c; }
+  .box { margin: 10px 0; padding: 10px 12px; border: 1px solid #c9c3bb; border-radius: 8px; background: #f7f5f2; font-size: 10.5pt; }
+  .box b { font-weight: 700; }
+  ol { margin: 4px 0 0; padding-left: 20px; } li { margin: 2px 0; }
+  .checks { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 6px 0; }
+  .checks span:before { content: "☐ "; font-size: 12pt; }
+  table { width: 100%; border-collapse: collapse; margin-top: 6px; font-size: 10.5pt; }
+  th { text-align: left; padding: 6px 6px; font-size: 9.5pt; letter-spacing: .04em; text-transform: uppercase; color: #5c5650; border-bottom: 2px solid #171614; }
+  td { height: 25px; padding: 0 6px; border-bottom: 1px solid #b9b3ab; }
+  td:first-child { width: 28px; color: #8b8782; }
+  .sig { display: flex; gap: 24px; margin-top: 18px; }
+  .sig div { flex: 1; border-top: 1px solid #171614; padding-top: 4px; font-size: 9.5pt; color: #5c5650; }
+  .page2 { break-before: page; }
+  .check-final { margin-top: 12px; }
+  footer { margin-top: 12px; font-size: 9pt; color: #8b8782; }
+</style>
+</head>
+<body>
+
+<section>
+  <div class="top"><h1>GulBar · do‘kon ma’lumotlari</h1><small>Sana: ____ / ____ / 2026</small></div>
+  <p class="lead">Bu ma’lumotlar buyurtmalar do‘konga to‘g‘ri kelishi va xaridorga to‘g‘ri ko‘rinishi uchun kerak. Bosma harflar bilan yozing.</p>
+
+  <h2>1. Do‘kon haqida</h2>
+  <div class="row"><label>Do‘kon nomi:</label><div class="line"></div></div>
+  <div class="row"><label>Qisqa tavsif (1 jumla):</label><div class="line"></div></div>
+  <div class="row"><label>Manzil (ko‘cha, mo‘ljal):</label><div class="line"></div></div>
+  <div class="row two"><div><label>Do‘kon telefoni:</label><div class="line"></div></div><div><label>Instagram:</label><div class="line"></div></div></div>
+  <div class="row two"><div><label>Egasining ismi:</label><div class="line"></div></div><div><label>Egasining telefoni:</label><div class="line"></div></div></div>
+
+  <h2>2. Ish va yetkazish</h2>
+  <div class="row two"><div><label>Ish vaqti:</label><div class="line"></div></div><div><label>Dam olish kuni:</label><div class="line"></div></div></div>
+  <div class="hint">Masalan: 09:00 – 01:00. Yopiq vaqtda xaridor faqat ertangi yetkazish uchun buyurtma beradi.</div>
+  <div class="row two"><div><label>Yetkazish haqi (so‘m):</label><div class="line"></div></div><div><label>Yetkazish muddati:</label><div class="line"></div></div></div>
+  <div class="hint">Masalan: 25 000 so‘m, 60–90 daqiqa. Yetkazish qaysi hududlarga: ______________________________</div>
+
+  <h2>3. Buyurtmalar Telegramga kelishi uchun</h2>
+  <div class="box">
+    <b>Telegram ID olish (1 daqiqa):</b>
+    <ol>
+      <li>Buyurtmalarni qabul qiladigan odamning telefonida <b>@GulBarr_bot</b> ni oching.</li>
+      <li><b>Start</b> bosing, keyin <b>/id</b> deb yozing — bot raqam yuboradi.</li>
+      <li>Raqamni quyiga yozing (yoki ekranni suratga oling).</li>
+    </ol>
+  </div>
+  <div class="row two"><div><label>Telegram ID:</label><div class="line"></div></div><div><label>Kim qabul qiladi (ism):</label><div class="line"></div></div></div>
+
+  <h2>4. Panelga kirish</h2>
+  <div class="row two"><div><label>Login (lotin, kichik harf):</label><div class="line"></div></div><div><label>Parol</label><div class="line" style="border-bottom-style:dotted"></div></div></div>
+  <div class="hint">Parolni bu varaqaga YOZMANG. Administrator uni panelda yaratib, egasiga alohida beradi.</div>
+
+  <div class="check-final">
+    <h2>5. Tayyorlanadigan narsalar</h2>
+    <div class="checks"><span>Logotip (rasm yoki fayl)</span><span>3–10 ta guldasta suratlari</span><span>Aniq narxlar</span><span>Qoldiq sonlari</span></div>
+  </div>
+</section>
+
+<section class="page2">
+  <div class="top"><h1>Guldastalar ro‘yxati</h1><small>Do‘kon: ______________________</small></div>
+  <p class="lead">Har bir guldasta uchun alohida surat (yorug‘da, yaqindan, tik turib) va ma’lumot. Kimga mos: <b>O</b> = ona, <b>R</b> = rafiqa, <b>Q</b> = qiz, <b>D</b> = do‘st, <b>H</b> = hamkasb.</p>
+  <table>
+    <thead><tr><th>№</th><th>Nomi</th><th style="width:105px">Narxi (so‘m)</th><th style="width:60px">Qoldiq</th><th style="width:110px">Kimga mos</th><th style="width:70px">Surat №</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td></td><td></td><td></td><td></td><td></td></tr><tr><td>2</td><td></td><td></td><td></td><td></td><td></td></tr>
+      <tr><td>3</td><td></td><td></td><td></td><td></td><td></td></tr><tr><td>4</td><td></td><td></td><td></td><td></td><td></td></tr>
+      <tr><td>5</td><td></td><td></td><td></td><td></td><td></td></tr><tr><td>6</td><td></td><td></td><td></td><td></td><td></td></tr>
+      <tr><td>7</td><td></td><td></td><td></td><td></td><td></td></tr><tr><td>8</td><td></td><td></td><td></td><td></td><td></td></tr>
+      <tr><td>9</td><td></td><td></td><td></td><td></td><td></td></tr><tr><td>10</td><td></td><td></td><td></td><td></td><td></td></tr>
+      <tr><td>11</td><td></td><td></td><td></td><td></td><td></td></tr><tr><td>12</td><td></td><td></td><td></td><td></td><td></td></tr>
+    </tbody>
+  </table>
+
+  <h2>Rozilik</h2>
+  <div class="box">
+    Men, yuqorida ko‘rsatilgan do‘kon vakili, do‘konimning nomi, logotipi, guldasta suratlari va narxlaridan <b>GulBar</b> ilovasida (Telegram Mini App) foydalanishga <b>roziman</b>. Ma’lumotlarni istalgan vaqt o‘zgartirishim yoki olib tashlashimni so‘rashim mumkinligini bilaman.
+  </div>
+  <div class="sig"><div>Ism, familiya</div><div>Imzo</div><div>Sana</div></div>
+
+  <h2>Do‘kon egasiga qisqacha</h2>
+  <div class="box">
+    <ol>
+      <li>Xaridor Telegram’da guldastani rasmda ko‘radi va buyurtma beradi.</li>
+      <li>Buyurtma sizning Telegramingizga keladi — <b>«Qabul qilish»</b> tugmasini bosasiz.</li>
+      <li>Gulni yetkazasiz, to‘lovni yetkazilganda olasiz.</li>
+      <li>30 daqiqa ichida javob bermasangiz, buyurtma avtomatik bekor qilinadi.</li>
+    </ol>
+  </div>
+  <footer>GulBar · @GulBarr_bot · gulbar.bella-rose.workers.dev</footer>
+</section>
+
+</body>
+</html>

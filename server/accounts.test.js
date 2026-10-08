@@ -1,0 +1,81 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { createApp } from './app.js';
+import { hashPassword, verifyPassword } from './accounts.js';
+const ownerKey = 'test-owner-bootstrap-key-123456';
+const initial = 'Temporary-Password-123';
+const permanent = 'Personal-Password-456';
+async function setup(t) {
+  const { app, db } = createApp({ demo: true, adminToken: ownerKey });
+  const server = app.listen(0, '127.0.0.1');
+  await new Promise(resolve => server.once('listening', resolve));
+  t.after(() => { server.close(); db.close(); });
+  const call = async (path, method = 'GET', body, token) => {
+    const res = await fetch(`http://127.0.0.1:${server.address().port}/api${path}`, { method, headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) }, ...(body ? { body: JSON.stringify(body) } : {}) });
+    return { status: res.status, data: await res.json() };
+  };
+  return { call, db };
+}
+const shop = id => ({ id, name: 'Test shop', subtitle: 'Test flowers', address: 'Urganch test address', deliveryFee: 25000, deliveryTime: '30–60 daqiqa', color: '#edf3ee', initials: 'TS', active: false });
+test('password hashes use independent salts and reject wrong passwords', async () => {
+  const a = await hashPassword(initial), b = await hashPassword(initial);
+  assert.notEqual(a, b); assert.ok(!a.includes(initial));
+  assert.equal(await verifyPassword(initial, a), true);
+  assert.equal(await verifyPassword('incorrect', a), false);
+});
+test('admin onboarding, forced password change, tenant isolation, reset and session revocation', async t => {
+  const { call, db } = await setup(t);
+  assert.equal((await call('/admin/workspace')).status, 401);
+  assert.equal((await call('/admin/bootstrap', 'POST', { login: 'owner', password: initial }, ownerKey)).status, 201);
+  assert.equal((await call('/admin/bootstrap', 'POST', { login: 'another', password: initial }, ownerKey)).status, 409);
+  const owner = (await call('/auth/login', 'POST', { login: 'owner', password: initial })).data;
+  assert.equal(owner.user.mustChangePassword, true);
+  assert.equal((await call('/admin/workspace', 'GET', undefined, owner.token)).status, 401);
+  assert.equal((await call('/auth/password', 'POST', { currentPassword: initial, newPassword: permanent }, owner.token)).status, 200);
+  assert.equal((await call('/admin/workspace', 'GET', undefined, owner.token)).status, 200);
+  const onboarding = { shop: shop('test-shop'), login: 'test.florist', password: initial, phone: '+998901234567', telegramChatId: '123456789' };
+  assert.equal((await call('/admin/onboard', 'POST', onboarding, owner.token)).status, 201);
+  assert.equal((await call('/merchant/test-shop/workspace')).status, 401);
+  assert.equal((await call('/admin/onboard', 'POST', { ...onboarding, shop: shop('orphan-shop') }, owner.token)).status, 409);
+  assert.equal(db.prepare('SELECT id FROM shops WHERE id=?').get('orphan-shop'), undefined);
+  const merchant = (await call('/auth/login', 'POST', { login: 'test.florist', password: initial })).data;
+  assert.equal((await call('/merchant/test-shop/workspace', 'GET', undefined, merchant.token)).status, 401);
+  assert.equal((await call('/auth/password', 'POST', { currentPassword: initial, newPassword: permanent }, merchant.token)).status, 200);
+  assert.equal((await call('/merchant/test-shop/workspace', 'GET', undefined, merchant.token)).status, 200);
+  assert.equal((await call('/merchant/lola/workspace', 'GET', undefined, merchant.token)).status, 401);
+  assert.equal((await call('/admin/workspace', 'GET', undefined, merchant.token)).status, 401);
+  assert.equal((await call('/merchant/test-shop/products', 'POST', { name: 'Test bouquet', description: 'Test description', category: 'bouquet', price: 120000, stock: 5, image: '/images/pink-bouquet.jpg' }, merchant.token)).status, 201);
+  const workspace = (await call('/admin/workspace', 'GET', undefined, owner.token)).data;
+  assert.equal(workspace.find(s => s.id === 'test-shop').telegramChatId, '123456789');
+  assert.ok(!JSON.stringify(workspace).includes('password_hash'));
+  assert.equal((await call('/admin/shops/test-shop/account', 'PATCH', { password: 'Reset-Temporary-Password' }, owner.token)).status, 200);
+  assert.equal((await call('/auth/me', 'GET', undefined, merchant.token)).status, 401);
+  assert.equal((await call('/auth/login', 'POST', { login: 'test.florist', password: permanent })).status, 401);
+  const reset = await call('/auth/login', 'POST', { login: 'test.florist', password: 'Reset-Temporary-Password' });
+  assert.equal(reset.data.user.mustChangePassword, true);
+  await call('/admin/shops/test-shop/account', 'PATCH', { enabled: false }, owner.token);
+  assert.equal((await call('/auth/me', 'GET', undefined, reset.data.token)).status, 401);
+  assert.equal((await call('/auth/login', 'POST', { login: 'test.florist', password: 'Reset-Temporary-Password' })).status, 401);
+  await call('/auth/logout', 'POST', {}, owner.token);
+  assert.equal((await call('/admin/workspace', 'GET', undefined, owner.token)).status, 401);
+  assert.ok(db.prepare('SELECT token_hash FROM sessions LIMIT 1').get()?.token_hash !== owner.token);
+});
+
+test('admin can give an existing shop its first login once; the shop owner cannot reach admin data', async t => {
+  const { call } = await setup(t);
+  await call('/admin/bootstrap', 'POST', { login: 'owner', password: initial }, ownerKey);
+  const owner = (await call('/auth/login', 'POST', { login: 'owner', password: initial })).data;
+  await call('/auth/password', 'POST', { currentPassword: initial, newPassword: permanent }, owner.token);
+  const { token } = (await call('/auth/login', 'POST', { login: 'owner', password: permanent })).data;
+  const bare = (await call('/admin/workspace', 'GET', undefined, token)).data.find(s => !s.login);
+  assert.ok(bare, 'a seeded shop without a login exists');
+  assert.equal((await call(`/admin/shops/${bare.id}/account`, 'POST', { login: 'x', password: 'short' }, token)).status, 400);
+  assert.equal((await call(`/admin/shops/${bare.id}/account`, 'POST', { login: 'madina.gullari', password: initial }, token)).status, 201);
+  assert.equal((await call(`/admin/shops/${bare.id}/account`, 'POST', { login: 'another.login', password: initial }, token)).status, 409);
+  assert.equal((await call('/admin/shops/no-such-shop/account', 'POST', { login: 'ghost.shop', password: initial }, token)).status, 404);
+  const shopOwner = (await call('/auth/login', 'POST', { login: 'madina.gullari', password: initial })).data;
+  assert.equal(shopOwner.user.role, 'merchant');
+  assert.equal(shopOwner.user.mustChangePassword, true);
+  assert.equal((await call('/admin/workspace', 'GET', undefined, shopOwner.token)).status, 401);
+  assert.equal((await call('/admin/workspace', 'GET', undefined, token)).data.find(s => s.id === bare.id).login, 'madina.gullari');
+});

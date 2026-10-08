@@ -1,0 +1,12 @@
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { randomBytes } from 'node:crypto';
+const root = name => new URL(`../${name}`, import.meta.url);
+const secrets = JSON.parse(readFileSync(root('.cloudflare-secrets.json'), 'utf8'));
+secrets.ADMIN_TOKEN ||= randomBytes(32).toString('hex');
+writeFileSync(root('.cloudflare-secrets.json'), JSON.stringify(secrets));
+const credentials = existsSync(root('.gulbar-admin-login.json')) ? JSON.parse(readFileSync(root('.gulbar-admin-login.json'), 'utf8')) : { login: 'gulbar-admin', password: randomBytes(18).toString('base64url') };
+writeFileSync(root('.gulbar-admin-login.json'), JSON.stringify(credentials));
+writeFileSync(root('.gulbar-admin-access.txt'), `GulBar admin paneli\nhttps://gulbar.bella-rose.workers.dev/admin\n\nLogin: ${credentials.login}\nVaqtinchalik parol: ${credentials.password}\n\nBirinchi kirishda o‘z parolingizni qo‘ying.\nBu fayldagi parol almashtirilgandan keyin ishlamaydi.\nParol va do‘kon hisoblarini boshqalarga bermang.\n`);
+const vars = existsSync(root('.dev.vars')) ? readFileSync(root('.dev.vars'), 'utf8') : '';
+writeFileSync(root('.dev.vars'), `${vars.replace(/^ADMIN_TOKEN=.*\r?\n?/gm, '').trim()}\nADMIN_TOKEN=${secrets.ADMIN_TOKEN}\n`);
+console.log('Owner admin credentials saved in ignored local files. No secret values printed.');

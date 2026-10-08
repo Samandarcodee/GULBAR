@@ -1,0 +1,58 @@
+/* Home "Minimal": search + price sheet, and a tighter phone layout so the first prices show on the first screen. */
+.gm-tools { display: flex; gap: 8px; margin-top: 18px; }
+.gm-search { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; min-height: 46px; padding: 0 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: var(--muted); transition: border-color .2s; }
+.gm-search:focus-within { border-color: var(--text); }
+.gm-search input { flex: 1; min-width: 0; border: 0; outline: 0; background: none; color: var(--text); font: inherit; font-size: 16px; min-height: 44px; }
+.gm-search input::-webkit-search-cancel-button { display: none; }
+.gm-search-clear { width: 32px; height: 32px; display: grid; place-items: center; border-radius: 8px; color: var(--muted); }
+.gm-search-clear:hover { background: var(--soft); }
+.gm-filter-btn { position: relative; display: inline-flex; align-items: center; gap: 7px; min-height: 46px; padding: 0 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: var(--text); font-size: 14px; font-weight: 500; }
+.gm-filter-btn.on { background: var(--text); color: var(--bg); border-color: var(--text); }
+.gm-filter-btn:focus-visible, .gm-opts button:focus-visible, .gm-search-clear:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+.gm-sheet fieldset { border: 0; padding: 0; margin: 0 0 20px; }
+.gm-sheet legend { font-size: 13px; font-weight: 600; margin-bottom: 10px; padding: 0; }
+.gm-opts { display: flex; flex-wrap: wrap; gap: 8px; }
+.gm-opts button { min-height: 44px; padding: 0 16px; border: 1px solid var(--line); border-radius: 22px; background: var(--surface); color: var(--text); font-size: 14px; }
+.gm-opts button.on { background: var(--text); color: var(--bg); border-color: var(--text); }
+.gm-sheet .text-button { margin-top: 6px; justify-content: center; }
+
+/* cart notice (stale cart) and cancelled-order reason */
+.cart-notes { margin: 0 0 14px; padding: 12px 14px; border-radius: 12px; background: #fbf1dc; color: #5a3f08; font-size: 13px; line-height: 1.55; }
+.cart-notes b { display: block; margin-bottom: 4px; }
+.cart-notes ul { margin: 0 0 6px; padding-left: 18px; }
+:root[data-theme=dark] .cart-notes { background: #3a2f17; color: #f1d9a0; }
+.cancel-reason { display: flex; gap: 10px; align-items: flex-start; margin-top: 10px; padding: 12px; border-radius: 12px; background: var(--soft); font-size: 13px; line-height: 1.55; }
+.cancel-reason > svg { flex-shrink: 0; margin-top: 2px; color: var(--muted); }
+.cancel-reason p { margin: 0; }
+.cancel-reason.expired, .cancel-reason.shop { background: #f6e6e3; color: #6e2a22; }
+.cancel-reason.expired > svg, .cancel-reason.shop > svg { color: #a42639; }
+:root[data-theme=dark] .cancel-reason.expired, :root[data-theme=dark] .cancel-reason.shop { background: #3d2220; color: #f1b3ab; }
+.cancel-next { margin-top: 6px !important; }
+.cancel-next span { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 6px; }
+.cancel-next a, .cancel-next button { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; color: inherit; }
+
+/* phones: shorter headline block, smaller store rings, so bouquets start higher */
+@media (max-width: 699px) {
+  .gm-hero { padding: 10px 0 0; }
+  .gm-eyebrow { display: none; }
+  .gm-title { margin-top: 0; font-size: clamp(30px, 9.4vw, 40px); }
+  .gm-quote { margin-top: 6px; min-height: calc(1.25em * 2); font-size: 16.5px; }
+  .gm-quote-line { margin-top: 6px; }
+  .gm-sub { display: none; }
+  .gm-shops { margin-top: 10px; gap: 14px; padding-bottom: 2px; }
+  .gm-shop { width: 64px; gap: 5px; }
+  .gm-shop-ring { width: 58px; height: 58px; }
+  .gm-shop-face { width: 52px; height: 52px; }
+  .gm-shop-face b { font-size: 19px; }
+  .gm-shop-name { max-width: 72px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11.5px; line-height: 1.2; }
+  .gm-shop-state { margin-top: -2px; font-size: 10.5px; white-space: nowrap; }
+  .gm-tools { margin-top: 8px; }
+  .gm-bar { margin-top: 2px; }
+  .gm-chips { padding: 4px 0; padding-right: 24px; }
+  .gm-count { margin: 8px 0 12px; }
+  .gm-count h2 { font-size: 22px; }
+  .gm-count p { font-size: 13px; }
+}
+@media (min-width: 1080px) {
+  .gm-tools { max-width: 560px; }
+}
