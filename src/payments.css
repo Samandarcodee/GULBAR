@@ -1,0 +1,41 @@
+/* Paying the shop by card transfer: checkout choice, the card block in an order, and the shop's own controls. */
+.pay-explain { font-size: 13px; line-height: 1.6; margin: 10px 0 0; color: var(--text); }
+.order-summary .split { color: var(--muted); font-size: 12px; margin: -4px 0 8px; }
+.order-summary .split span { display: inline-flex; align-items: center; gap: 6px; }
+
+.pay-block { display: flex; gap: 10px; align-items: flex-start; margin-top: 12px; padding: 12px; border-radius: 12px; background: var(--soft); font-size: 13px; line-height: 1.55; }
+.pay-block > svg { flex-shrink: 0; margin-top: 2px; color: var(--muted); }
+.pay-block p { margin: 2px 0 0; color: var(--muted); }
+.pay-block.ok { background: #e3f1e6; color: #1f5a2c; }
+.pay-block.ok > svg, .pay-block.ok p { color: #1f5a2c; }
+.pay-block.warn { background: #f6e6e3; color: #6e2a22; }
+.pay-block.warn > svg, .pay-block.warn p { color: #a42639; }
+:root[data-theme=dark] .pay-block.ok { background: #1f3a24; color: #9fd8a8; }
+:root[data-theme=dark] .pay-block.ok > svg, :root[data-theme=dark] .pay-block.ok p { color: #9fd8a8; }
+:root[data-theme=dark] .pay-block.warn { background: #3d2220; color: #f1b3ab; }
+.pay-phone { display: inline-flex; align-items: center; gap: 5px; min-height: 44px; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; color: inherit; }
+
+.pay-block.due { display: block; border: 1.5px solid var(--brand); background: var(--surface); padding: 16px; }
+.pay-head { display: flex; align-items: center; gap: 8px; font-size: 15px; margin-bottom: 10px; }
+.pay-head svg { color: var(--brand); }
+.pay-warn { color: #a42639 !important; margin: 0 0 10px !important; }
+.pay-card { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 12px 14px; border-radius: 10px; background: var(--soft); }
+.pay-number { font-size: 19px; font-weight: 700; letter-spacing: .04em; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.pay-copy { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); font-size: 12px; font-weight: 600; }
+.pay-copy:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.pay-meta { margin: 8px 0 0; font-size: 13px; color: var(--text) !important; }
+.pay-time, .pay-cash { display: flex; align-items: center; gap: 7px; margin: 8px 0 0 !important; font-size: 12px; }
+.pay-note { margin: 14px 0 12px; }
+.pay-block.due .primary { margin-top: 2px; }
+
+/* the shop's side */
+.pay-line { display: flex; align-items: flex-start; gap: 8px; margin: 10px 0; font-size: 13px; line-height: 1.55; }
+.pay-line > svg { flex-shrink: 0; margin-top: 3px; color: var(--muted); }
+.pay-line p { margin: 0 0 4px; }
+.pay-line.card { padding: 10px 12px; border-radius: 10px; background: var(--soft); }
+.pay-line.card.ok { background: #e3f1e6; color: #1f5a2c; }
+:root[data-theme=dark] .pay-line.card.ok { background: #1f3a24; color: #9fd8a8; }
+.pay-line .order-actions { margin-top: 8px; }
+.merchant-pay { margin-top: 20px; }
+
+.method-toggle button:disabled { opacity: .45; cursor: not-allowed; }

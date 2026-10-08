@@ -136,6 +136,7 @@ export async function accountRequest(store, path, method, body, token, adminAuth
         ['DELETE FROM products WHERE shop_id=?', [id]],
         ['DELETE FROM sessions WHERE account_id IN (SELECT id FROM accounts WHERE shop_id=?)', [id]],
         ['DELETE FROM accounts WHERE shop_id=?', [id]],
+        ['DELETE FROM shop_cards WHERE shop_id=?', [id]],
         ['DELETE FROM shop_private WHERE shop_id=?', [id]],
         ['DELETE FROM shops WHERE id=?', [id]],
       ]);

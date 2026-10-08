@@ -11,4 +11,5 @@ import './home-tools.css';
 import './panel.css';
 import './extras.css';
 import './checkout-v2.css';
+import './payments.css';
 ReactDOM.createRoot(document.getElementById('root')!).render(<React.StrictMode><ErrorBoundary><App /></ErrorBoundary></React.StrictMode>);

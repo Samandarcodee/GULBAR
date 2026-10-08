@@ -8,6 +8,12 @@ export function secureEqual(a, b) {
 
 // Telegram only signs the launch time once; a Mini App that stays open for hours must keep working, so the window is a day.
 export const MAX_AGE_SECONDS = 24 * 3600;
+/** A real Telegram buyer is stored as `tg:<id>`; the bare id is what the Bot API needs as chat_id. Demo visitors have none. */
+export function telegramUserId(customerId) {
+  const match = /^tg:(\d{1,16})$/.exec(String(customerId ?? ''));
+  return match ? match[1] : '';
+}
+
 export function validateTelegram(raw, token, now = Date.now()) {
   if (!raw || !token || raw.length > 16000) throw new Error('Telegram orqali qayta kiring.');
   const params = new URLSearchParams(raw);

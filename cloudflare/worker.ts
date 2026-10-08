@@ -1,6 +1,6 @@
 import { Hono, type Context, type MiddlewareHandler } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
-import { secureEqual, validateTelegram } from '../server/auth.js';
+import { secureEqual, telegramUserId, validateTelegram } from '../server/auth.js';
 import { commandReply, telegramParameters } from '../server/telegram-commands.js';
 import { isOpen, nextOpen, hoursLabel } from '../server/hours.js';
 import { validateDelivery, shopOrderText } from '../server/delivery.js';
@@ -10,9 +10,10 @@ import { buyerMessage, shopExpiredMessage, EXPIRE_SQL, FIND_EXPIRED_SQL, expiryM
 import { accountStore, accountAccess, accountRequest } from '../server/accounts.js';
 import { imageType, MAX_IMAGE_BYTES } from '../server/images.js';
 import { orderSchema, productSchema, shopSchema, shopSettingsSchema, statusNames } from '../server/schemas.js';
+import { advanceCheck, buyerPaymentMessage, choosePayment, claimPayment, decidePayment, decorateOrder, dueMinutes, EXPIRE_UNPAID_SQL, FIND_UNPAID_SQL, maskCard, payInfo, paymentClaimSchema, paymentDecisionSchema, paymentSettingsSchema, SAVE_CARD_SQL, shopClaimText, shopUnpaidMessage } from '../server/payment.js';
 import type { Product, Shop, Order } from '../src/types';
 
-type WorkerEnv = Env & Partial<Record<'DEMO_MERCHANT_TOKEN' | 'ADMIN_TOKEN' | 'TELEGRAM_BOT_TOKEN' | 'TELEGRAM_WEBHOOK_SECRET' | 'SHOP_CHAT_IDS' | 'MERCHANT_TOKENS' | 'APP_URL' | 'PENDING_EXPIRY_MINUTES' | 'ADMIN_CHAT_ID', string>>;
+type WorkerEnv = Env & Partial<Record<'DEMO_MERCHANT_TOKEN' | 'ADMIN_TOKEN' | 'TELEGRAM_BOT_TOKEN' | 'TELEGRAM_WEBHOOK_SECRET' | 'SHOP_CHAT_IDS' | 'MERCHANT_TOKENS' | 'APP_URL' | 'PENDING_EXPIRY_MINUTES' | 'PAYMENT_DUE_MINUTES' | 'ADMIN_CHAT_ID', string>>;
 type Bindings = { Bindings: WorkerEnv; Variables: { customerId: string } };
 type C = Context<Bindings>;
 type Row = { data: string };
@@ -23,6 +24,13 @@ const mapping = (raw: string | undefined): Record<string, string> => raw ? JSON.
 const bearer = (c: C) => (c.req.header('Authorization') || '').replace(/^Bearer /, '');
 const shopById = async (env: WorkerEnv, id: string) => decode<Shop>(await env.DB.prepare('SELECT data FROM shops WHERE id=?').bind(id).first<Row>());
 const orderById = async (env: WorkerEnv, id: string) => decode<Order>(await env.DB.prepare('SELECT data FROM orders WHERE id=?').bind(id).first<Row>());
+type Card = { number: string; holder: string; bank: string };
+const cardOf = (env: WorkerEnv, shopId: string) => env.DB.prepare('SELECT number, holder, bank FROM shop_cards WHERE shop_id=?').bind(shopId).first<Card>();
+// Writes the new order only if nobody changed it since it was read (compare-and-swap on the stored JSON).
+async function saveIfUnchanged(env: WorkerEnv, before: string, next: Order) {
+  const written = await env.DB.prepare('UPDATE orders SET data=? WHERE id=? AND data=?').bind(JSON.stringify(next), next.id, before).run();
+  return written.meta.changes > 0;
+}
 
 app.get('/api/images/:id', async c => {
   const row = await c.env.DB.prepare('SELECT content_type,body FROM images WHERE id=?').bind(c.req.param('id')).first<{ content_type: string; body: number[] }>();
@@ -53,6 +61,7 @@ const customer: MiddlewareHandler<Bindings> = async (c, next) => {
 app.use('/api/orders', customer);
 app.use('/api/orders/:id/review', customer);
 app.use('/api/orders/:id/cancel', customer);
+app.use('/api/orders/:id/payment', customer);
 app.use('/api/support', customer);
 app.use('/api/merchant/:shopId/*', async (c, next) => {
   if (await accountAccess(accountStore(c.env.DB, true), bearer(c), 'merchant', c.req.param('shopId'))) { await next(); return; }
@@ -101,7 +110,9 @@ app.get('/api/catalog', async c => {
 app.get('/api/orders', async c => {
   const result = await c.env.DB.prepare('SELECT data FROM orders WHERE customer_id=? ORDER BY created_at DESC LIMIT 100').bind(c.get('customerId')).all<Row>();
   const reviewed = new Set((await c.env.DB.prepare('SELECT order_id FROM reviews WHERE customer_id=?').bind(c.get('customerId')).all<{ order_id: string }>()).results.map(r => r.order_id));
-  return c.json(result.results.map(r => { const o = decode<Order>(r)!; return { ...o, reviewed: reviewed.has(o.id) }; }));
+  const cards = new Map((await c.env.DB.prepare("SELECT shop_id, number, holder, bank FROM shop_cards WHERE shop_id IN (SELECT DISTINCT json_extract(data,'$.shopId') FROM orders WHERE customer_id=?)").bind(c.get('customerId')).all<Card & { shop_id: string }>()).results.map(r => [r.shop_id, r] as const));
+  const minutes = dueMinutes(c.env.PAYMENT_DUE_MINUTES);
+  return c.json(result.results.map(r => { const o = decode<Order>(r)!; return { ...decorateOrder(o, cards.get(o.shopId) || null, minutes), reviewed: reviewed.has(o.id) }; }));
 });
 app.post('/api/orders/:id/cancel', async c => {
   const id = c.req.param('id'), cid = c.get('customerId');
@@ -122,6 +133,18 @@ app.post('/api/orders/:id/cancel', async c => {
     if (chat) await telegram(c.env, 'sendMessage', { chat_id: chat, text: `Xaridor buyurtmani bekor qildi: #${id.slice(0, 8)}. Gullar qoldiqqa qaytarildi.` }).catch(() => {});
   })());
   return c.json(await orderById(c.env, id));
+});
+app.post('/api/orders/:id/payment', async c => {
+  const body = paymentClaimSchema.safeParse(await c.req.json().catch(() => ({})));
+  if (!body.success) return c.json({ error: body.error.issues[0].message }, 400);
+  const row = await c.env.DB.prepare('SELECT data FROM orders WHERE id=? AND customer_id=?').bind(c.req.param('id'), c.get('customerId')).first<Row>();
+  const order = decode<Order>(row);
+  if (!row || !order) return c.json({ error: 'Buyurtma topilmadi.' }, 404);
+  const claimed = claimPayment(order, body.data.note, new Date());
+  if (!claimed.ok) return c.json({ error: claimed.error }, 409);
+  if (!await saveIfUnchanged(c.env, row.data, claimed.order)) return c.json({ error: 'Buyurtma yangilandi. Qayta urinib ko‘ring.' }, 409);
+  c.executionCtx.waitUntil(tellShopAboutClaim(c.env, claimed.order));
+  return c.json(decorateOrder(claimed.order, await cardOf(c.env, order.shopId), dueMinutes(c.env.PAYMENT_DUE_MINUTES)));
 });
 app.post('/api/support', async c => {
   const body = supportSchema.safeParse(await c.req.json());
@@ -165,6 +188,8 @@ app.post('/api/orders', async c => {
     if (!checked.ok) return c.json({ error: checked.error }, 409);
     chosen = checked;
   } else if (!openNow && input.customer.deliveryTime !== 'tomorrow') return c.json({ error: `Do‘kon hozir yopiq (ish vaqti ${hoursLabel(shop.hours)}). Ertangi yetkazish uchun buyurtma bering.` }, 409);
+  const payment = choosePayment(input.payment, shop, chosen?.ok ? chosen.delivery.method : 'delivery');
+  if (!payment.ok) return c.json({ error: payment.error }, 409);
   const chatId = await shopChatId(c.env, shop.id);
   if (!demo(c.env) && (!c.env.TELEGRAM_BOT_TOKEN || !chatId)) return c.json({ error: 'Do‘konning Telegram kanali hali ulanmagan.' }, 503);
   const quantities = new Map<string, number>();
@@ -180,7 +205,7 @@ app.post('/api/orders', async c => {
     items.push({ productId, quantity, name: p.name, image: p.image, price: p.price });
   }
   const subtotal = items.reduce((sum, i) => sum + i.quantity * i.price, 0);
-  const order: Order = { id: crypto.randomUUID(), shopId: shop.id, shopName: shop.name, items,
+  const order: Order = { id: crypto.randomUUID(), shopId: shop.id, shopName: shop.name, items, payment: payment.payment as Order['payment'],
     customer: { ...input.customer, ...(chosen?.ok ? { deliveryTime: chosen.legacy as Order['customer']['deliveryTime'] } : {}), ...(chosen?.ok && chosen.delivery.method === 'pickup' ? { address: `Olib ketish: ${shop.address}` } : {}) },
     ...(chosen?.ok ? { delivery: chosen.delivery } : {}),
     subtotal, deliveryFee: chosen?.ok && chosen.delivery.method === 'pickup' ? 0 : shop.deliveryFee, total: subtotal + (chosen?.ok && chosen.delivery.method === 'pickup' ? 0 : shop.deliveryFee), status: 'pending',
@@ -222,14 +247,15 @@ app.patch('/api/merchant/:shopId/settings', async c => {
 });
 app.get('/api/merchant/:shopId/orders', async c => {
   const result = await c.env.DB.prepare("SELECT data FROM orders WHERE json_extract(data,'$.shopId')=? ORDER BY created_at DESC LIMIT 100").bind(c.req.param('shopId')).all<Row>();
-  return c.json(result.results.map(r => decode<Order>(r)));
+  return c.json(result.results.map(r => decorateOrder(decode<Order>(r)!, null)));
 });
 async function changeStatus(env: WorkerEnv, order: Order, status: string, ctx?: { waitUntil(promise: Promise<unknown>): void }) {
   if (!Object.hasOwn(statusNames, status)) throw new Error('invalid_status');
+  if (!advanceCheck(order, status).ok) throw new Error('payment_not_confirmed');
   // The SQL trigger validates the transition and restocks only once on cancellation.
   // a cancellation made from the shop side records why, so the buyer sees the reason
-  const result = await env.DB.prepare(`UPDATE orders SET data=json_set(data,'$.status',?,'$.updatedAt',?${status === 'cancelled' ? ",'$.cancelReason','shop'" : ''}) WHERE id=? AND json_extract(data,'$.status')=?`)
-    .bind(status, new Date().toISOString(), order.id, order.status).run();
+  const result = await env.DB.prepare(`UPDATE orders SET data=json_set(data,'$.status',?,'$.updatedAt',?${status === 'cancelled' ? ",'$.cancelReason','shop'" : ''}) WHERE id=? AND json_extract(data,'$.status')=? AND (? NOT IN ('delivering','delivered') OR json_extract(data,'$.payment.method') IS NOT 'card' OR json_extract(data,'$.payment.status')='confirmed')`)
+    .bind(status, new Date().toISOString(), order.id, order.status, status).run();
   const current = await orderById(env, order.id);
   if (!result.meta.changes && current?.status !== status) throw new Error('status_changed');
   // Only the request that really changed the status tells the buyer, so a retry never sends a second message.
@@ -241,8 +267,53 @@ app.patch('/api/merchant/:shopId/orders/:id', async c => {
   if (!order || order.shopId !== c.req.param('shopId')) return c.json({ error: 'Buyurtma topilmadi.' }, 404);
   const body: { status?: unknown } = await c.req.json();
   if (typeof body.status !== 'string') return c.json({ error: 'Holat noto‘g‘ri.' }, 400);
-  try { return c.json(await changeStatus(c.env, order, body.status, c.executionCtx)); }
+  const gate = advanceCheck(order, body.status);
+  if (!gate.ok) return c.json({ error: gate.error }, 409);
+  try { return c.json(decorateOrder((await changeStatus(c.env, order, body.status, c.executionCtx))!, null)); }
   catch { return c.json({ error: 'Bu holatga o‘tish mumkin emas. Buyurtmani yangilang.' }, 409); }
+});
+// the shop answers about the money: it arrived, it did not, or it was handed back after a cancellation
+async function applyPaymentDecision(env: WorkerEnv, id: string, shopId: string, action: 'confirm' | 'reject' | 'refunded', ctx?: { waitUntil(promise: Promise<unknown>): void }) {
+  const row = await env.DB.prepare('SELECT data FROM orders WHERE id=?').bind(id).first<Row>();
+  const order = decode<Order>(row);
+  if (!row || !order || order.shopId !== shopId) return { status: 404 as const, body: { error: 'Buyurtma topilmadi.' } };
+  const decided = decidePayment(order, action, new Date());
+  if (!decided.ok) return { status: 409 as const, body: { error: decided.error } };
+  if (!await saveIfUnchanged(env, row.data, decided.order)) return { status: 409 as const, body: { error: 'Buyurtma yangilandi. Panelni yangilang.' } };
+  const shopPhone = (await env.DB.prepare('SELECT phone FROM shop_private WHERE shop_id=?').bind(shopId).first<{ phone: string }>())?.phone || '';
+  const event = { confirm: 'confirmed', reject: 'rejected', refunded: 'refunded' }[action];
+  const told = tellBuyer(env, decided.order, buyerPaymentMessage(decided.order, event, { shopPhone, minutes: dueMinutes(env.PAYMENT_DUE_MINUTES) }));
+  if (ctx) ctx.waitUntil(told); else await told;
+  return { status: 200 as const, body: decorateOrder(decided.order, null) };
+}
+app.post('/api/merchant/:shopId/orders/:id/payment', async c => {
+  const body = paymentDecisionSchema.safeParse(await c.req.json().catch(() => ({})));
+  if (!body.success) return c.json({ error: 'Amal noto‘g‘ri.' }, 400);
+  const done = await applyPaymentDecision(c.env, c.req.param('id'), c.req.param('shopId'), body.data.action, c.executionCtx);
+  return c.json(done.body, done.status);
+});
+app.get('/api/merchant/:shopId/payment', async c => {
+  const shop = await shopById(c.env, c.req.param('shopId'));
+  if (!shop) return c.json({ error: 'Do‘kon topilmadi.' }, 404);
+  return c.json({ acceptsCard: !!shop.acceptsCard, delivery: shop.delivery || 'own', card: (await cardOf(c.env, shop.id)) || null });
+});
+app.put('/api/merchant/:shopId/payment', async c => {
+  const id = c.req.param('shopId');
+  const row = await c.env.DB.prepare('SELECT data FROM shops WHERE id=?').bind(id).first<Row>();
+  const shop = decode<Shop>(row);
+  if (!row || !shop) return c.json({ error: 'Do‘kon topilmadi.' }, 404);
+  const parsed = paymentSettingsSchema.safeParse(await c.req.json().catch(() => ({})));
+  if (!parsed.success) return c.json({ error: parsed.error.issues[0].message }, 400);
+  const card = parsed.data.card || (await cardOf(c.env, id)) || null;
+  if (parsed.data.acceptsCard && !card) return c.json({ error: 'Kartaga o‘tkazmani yoqish uchun karta ma’lumotlarini kiriting.' }, 400);
+  const updated = { ...shop, acceptsCard: parsed.data.acceptsCard, delivery: parsed.data.delivery };
+  const statements = [c.env.DB.prepare('UPDATE shops SET data=? WHERE id=? AND data=?').bind(JSON.stringify(updated), id, row.data)];
+  if (parsed.data.card) statements.push(c.env.DB.prepare(SAVE_CARD_SQL).bind(id, parsed.data.card.number, parsed.data.card.holder, parsed.data.card.bank, new Date().toISOString()));
+  const written = await c.env.DB.batch(statements);
+  if (!written[0].meta.changes) return c.json({ error: 'Sozlamalar o‘zgardi. Panelni yangilang.' }, 409);
+  // a swapped card is the classic way to divert customers' money, so the owner hears about every change
+  if (parsed.data.card && c.env.ADMIN_CHAT_ID && c.env.TELEGRAM_BOT_TOKEN) c.executionCtx.waitUntil(telegram(c.env, 'sendMessage', { chat_id: c.env.ADMIN_CHAT_ID, text: `Do‘kon kartasi o‘zgartirildi: ${shop.name}\nYangi karta: ${maskCard(parsed.data.card.number)} · ${parsed.data.card.holder}` }).catch(() => {}));
+  return c.json({ acceptsCard: parsed.data.acceptsCard, delivery: parsed.data.delivery, card });
 });
 app.post('/api/merchant/:shopId/products', async c => {
   const shopId = c.req.param('shopId');
@@ -319,15 +390,57 @@ async function notifyBuyer(env: WorkerEnv, order: Order, status: string, extra: 
   if (demo(env) || order.demo || !env.TELEGRAM_BOT_TOKEN) return;
   try {
     const row = await env.DB.prepare('SELECT customer_id FROM orders WHERE id=?').bind(order.id).first<{ customer_id: string }>();
-    if (!row || !/^d{1,16}$/.test(row.customer_id)) return;
+    const chatId = telegramUserId(row?.customer_id);
+    if (!chatId) return;
     const shopPhone = (await env.DB.prepare('SELECT phone FROM shop_private WHERE shop_id=?').bind(order.shopId).first<{ phone: string }>())?.phone || '';
     const appUrl = env.APP_URL || 'https://gulbar.bella-rose.workers.dev';
-    const text = buyerMessage(order, status, { shopPhone, ...extra });
+    const minutes = dueMinutes(env.PAYMENT_DUE_MINUTES);
+    const pay = status === 'accepted' ? payInfo(order, await cardOf(env, order.shopId), minutes) : null;
+    const text = buyerMessage(order, status, { shopPhone, ...extra, ...(pay ? { pay, minutes } : {}) });
     if (!text) return;
-    await telegram(env, 'sendMessage', { chat_id: row.customer_id, text, reply_markup: { inline_keyboard: [status === 'delivered' ? [{ text: 'Baho berish', web_app: { url: `${appUrl}/?orders=1` } }, { text: 'GulBar’ni ochish', web_app: { url: appUrl } }] : [{ text: 'GulBar’ni ochish', web_app: { url: appUrl } }]] } });
+    await telegram(env, 'sendMessage', { chat_id: chatId, text, reply_markup: { inline_keyboard: [status === 'delivered' ? [{ text: 'Baho berish', web_app: { url: `${appUrl}/?orders=1` } }, { text: 'GulBar’ni ochish', web_app: { url: appUrl } }] : [{ text: 'GulBar’ni ochish', web_app: { url: appUrl } }]] } });
   } catch { /* the buyer can still follow the order inside the app */ }
 }
 
+// Plain message to the buyer's Telegram chat (best effort, never breaks the order).
+async function tellBuyer(env: WorkerEnv, order: Order, text: string | null) {
+  if (!text || demo(env) || order.demo || !env.TELEGRAM_BOT_TOKEN) return;
+  try {
+    const row = await env.DB.prepare('SELECT customer_id FROM orders WHERE id=?').bind(order.id).first<{ customer_id: string }>();
+    const chatId = telegramUserId(row?.customer_id);
+    if (!chatId) return;
+    const appUrl = env.APP_URL || 'https://gulbar.bella-rose.workers.dev';
+    await telegram(env, 'sendMessage', { chat_id: chatId, text, reply_markup: { inline_keyboard: [[{ text: 'GulBar’ni ochish', web_app: { url: `${appUrl}/?orders=1` } }]] } });
+  } catch { /* the buyer can still follow the order inside the app */ }
+}
+// The buyer says the money was sent: the shop gets two buttons to answer from Telegram.
+async function tellShopAboutClaim(env: WorkerEnv, order: Order) {
+  if (demo(env) || order.demo || !env.TELEGRAM_BOT_TOKEN) return;
+  try {
+    const chat = await shopChatId(env, order.shopId);
+    if (!chat) return;
+    await telegram(env, 'sendMessage', { chat_id: chat, text: shopClaimText(order),
+      reply_markup: { inline_keyboard: [[{ text: 'Pul tushdi', callback_data: `pay:${order.id}:confirm` }, { text: 'Tushmadi', callback_data: `pay:${order.id}:reject` }]] } });
+  } catch { /* the shop can still confirm in its panel */ }
+}
+// An accepted card order that stayed unpaid must not hold the flowers: cancel after PAYMENT_DUE_MINUTES (default 30).
+async function expireUnpaid(env: WorkerEnv) {
+  if (demo(env)) return;
+  const minutes = dueMinutes(env.PAYMENT_DUE_MINUTES);
+  const cutoff = new Date(Date.now() - minutes * 60000).toISOString();
+  const due = await env.DB.prepare(FIND_UNPAID_SQL).bind(cutoff).all<{ id: string }>();
+  for (const { id } of due.results) {
+    try {
+      const written = await env.DB.prepare(EXPIRE_UNPAID_SQL).bind(new Date().toISOString(), id, cutoff).run();
+      if (!written.meta.changes) continue;
+      const order = await orderById(env, id);
+      if (!order) continue;
+      await tellBuyer(env, order, buyerPaymentMessage(order, 'unpaid', { minutes }));
+      const chat = await shopChatId(env, order.shopId);
+      if (chat && env.TELEGRAM_BOT_TOKEN) await telegram(env, 'sendMessage', { chat_id: chat, text: shopUnpaidMessage(order, minutes) }).catch(() => {});
+    } catch { /* picked up again by the next minute's run */ }
+  }
+}
 // A shop that does not answer must not keep the flowers reserved forever: cancel after PENDING_EXPIRY_MINUTES (default 30).
 async function expirePending(env: WorkerEnv) {
   if (demo(env)) return;
@@ -359,16 +472,36 @@ app.post('/api/telegram/webhook', async c => {
   const callback = update.callback_query;
   if (!callback) return c.json({ ok: true });
   if (demo(c.env)) return c.json({ error: 'Demo order callbacks are disabled.' }, 403);
+  const pay = /^pay:([a-f0-9-]{36}):(confirm|reject)$/.exec(callback.data || '');
+  if (pay) {
+    const target = await orderById(c.env, pay[1]);
+    const where = callback.message?.chat;
+    if (!target || where?.type !== 'private' || String(where.id) !== String(await shopChatId(c.env, target.shopId)) || callback.from?.id !== where.id) return c.json({ error: 'Forbidden' }, 403);
+    const done = await applyPaymentDecision(c.env, target.id, target.shopId, pay[2] as 'confirm' | 'reject', c.executionCtx);
+    try {
+      if (done.status === 200) await telegram(c.env, 'editMessageReplyMarkup', { chat_id: where.id, message_id: callback.message!.message_id,
+        reply_markup: { inline_keyboard: pay[2] === 'confirm' ? [[{ text: statusNames.delivering, callback_data: `order:${target.id}:delivering` }]] : [] } });
+      await telegram(c.env, 'answerCallbackQuery', { callback_query_id: callback.id, text: done.status === 200 ? (pay[2] === 'confirm' ? 'To‘lov tasdiqlandi' : 'Mijozdan to‘lovni qayta so‘radik') : 'Bu to‘lovni hozir o‘zgartirib bo‘lmaydi.' });
+    } catch { /* best effort */ }
+    return done.status === 200 ? c.json({ ok: true }) : c.json({ error: 'To‘lov yangilanmadi.' }, 409);
+  }
   const match = /^order:([a-f0-9-]{36}):(accepted|cancelled|delivering|delivered)$/.exec(callback.data || '');
   const order = match ? await orderById(c.env, match[1]) : null;
   const chat = callback.message?.chat;
   if (!match || !order || chat?.type !== 'private' || String(chat.id) !== String(await shopChatId(c.env, order.shopId)) || callback.from?.id !== chat.id) return c.json({ error: 'Forbidden' }, 403);
+  const gate = advanceCheck(order, match[2]);
+  if (!gate.ok) {
+    try { await telegram(c.env, 'answerCallbackQuery', { callback_query_id: callback.id, text: gate.error, show_alert: true }); } catch { /* best effort */ }
+    return c.json({ error: gate.error }, 409);
+  }
   try {
-    await changeStatus(c.env, order, match[2], c.executionCtx);
+    const after = await changeStatus(c.env, order, match[2], c.executionCtx);
     const next: Record<string, string> = { accepted: 'delivering', delivering: 'delivered' };
     const status = next[match[2]];
+    // a card order waits for the money before it can go out, so the next button is "Pul tushdi"
+    const owed = match[2] === 'accepted' && after?.payment?.method === 'card' && after.payment.status !== 'confirmed';
     await telegram(c.env, 'editMessageReplyMarkup', { chat_id: chat.id, message_id: callback.message!.message_id,
-      reply_markup: { inline_keyboard: status ? [[{ text: statusNames[status as keyof typeof statusNames], callback_data: `order:${order.id}:${status}` }]] : [] } });
+      reply_markup: { inline_keyboard: owed ? [[{ text: 'Pul tushdi', callback_data: `pay:${order.id}:confirm` }]] : status ? [[{ text: statusNames[status as keyof typeof statusNames], callback_data: `order:${order.id}:${status}` }]] : [] } });
     await telegram(c.env, 'answerCallbackQuery', { callback_query_id: callback.id, text: statusNames[match[2] as keyof typeof statusNames] });
     return c.json({ ok: true });
   } catch {
@@ -392,6 +525,7 @@ export default {
   async scheduled(_event: ScheduledController, env: WorkerEnv, _ctx: ExecutionContext) {
     await flushOutbox(env);
     await expirePending(env);
+    await expireUnpaid(env);
   },
 } satisfies ExportedHandler<WorkerEnv>;
 

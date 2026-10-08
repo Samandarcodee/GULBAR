@@ -1,9 +1,12 @@
 // Telegram messages sent to the buyer when a shop acts on their order, and the SQL that expires unanswered orders.
 // Plain text only (no parse_mode); order fields come from our own database, never from Telegram.
+import { cardPayText } from './payment.js';
 const money = n => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
 
-export function buyerMessage(order, status, { shopPhone = '', expired = false, minutes = 30 } = {}) {
+export function buyerMessage(order, status, { shopPhone = '', expired = false, minutes = 30, pay = /** @type {any} */ (null) } = {}) {
   const head = `${order.shopName} · #${String(order.id).slice(0, 8)}`;
+  // a card order asks for the transfer right away; `minutes` is then the payment window
+  if (status === 'accepted' && pay) return `Buyurtmangiz qabul qilindi ✅\n\n${head}\n${cardPayText(pay, minutes)}`;
   if (status === 'accepted') return `Buyurtmangiz qabul qilindi ✅\n\n${head}\nJami: ${money(order.total)} so‘m (to‘lov yetkazilganda)\n\nGullar tayyorlanmoqda. Yo‘lga chiqqanda yana xabar beramiz.`;
   if (status === 'delivering') return `Buyurtmangiz yo‘lda 🚚\n\n${head}\nDo‘kon gullarni manzilingizga yetkazmoqda.`;
   if (status === 'delivered') return `Gullar yetkazildi 🌷\n\n${head}\nXaridingiz uchun rahmat! Xizmatni baholab, boshqa xaridorlarga yordam bering.`;

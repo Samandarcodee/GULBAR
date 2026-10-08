@@ -21,6 +21,7 @@ const order = request => request('/orders', { method: 'POST', body: { requestKey
 
 test('a shop with unfinished orders cannot be deleted; once they are done the shop and what it owned disappear, history stays', async t => {
   const { request, db } = await setup(t);
+  assert.equal((await request('/merchant/lola/payment', { method: 'PUT', body: { acceptsCard: true, delivery: 'own', card: { number: '8600 1234 5678 9012', holder: 'Madina Karimova' } } })).status, 200);
   const placed = await order(request);
   assert.equal(placed.status, 201);
 
@@ -38,6 +39,7 @@ test('a shop with unfinished orders cannot be deleted; once they are done the sh
   assert.equal(db.prepare('SELECT id FROM shops WHERE id=?').get('lola'), undefined);
   assert.equal(db.prepare("SELECT COUNT(*) AS n FROM products WHERE shop_id='lola'").get().n, 0);
   assert.equal(db.prepare("SELECT COUNT(*) AS n FROM shop_private WHERE shop_id='lola'").get().n, 0);
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM shop_cards WHERE shop_id='lola'").get().n, 0, 'the shop card goes too');
   assert.ok(db.prepare('SELECT id FROM orders WHERE id=?').get(placed.data.id), 'the buyer keeps the order history');
   const catalog = (await request('/catalog')).data;
   assert.ok(!catalog.shops.some(s => s.id === 'lola') && !catalog.products.some(p => p.shopId === 'lola'));

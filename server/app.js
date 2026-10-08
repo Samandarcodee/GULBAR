@@ -12,6 +12,7 @@ import { supportSchema, createTicket, listMine, ticketAdminText } from './suppor
 import { reviewSchema, reviewerName, INSERT_REVIEW_SQL, RATINGS_SQL, SHOP_RATING_SQL, SHOP_REVIEWS_SQL, PHONES_SQL, decorateShops } from './reviews.js';
 import { accountStore, accountAccess, accountRequest } from './accounts.js';
 import { imageType, MAX_IMAGE_BYTES } from './images.js';
+import { advanceCheck, choosePayment, claimPayment, decidePayment, decorateOrder, paymentClaimSchema, paymentDecisionSchema, paymentSettingsSchema, SAVE_CARD_SQL } from './payment.js';
 
 const parse = row => row ? JSON.parse(row.data) : null;
 
@@ -72,11 +73,15 @@ export function createApp(config = {}) {
   const getShop = id => parse(db.prepare('SELECT data FROM shops WHERE id=?').get(id));
   const getProduct = id => parse(db.prepare('SELECT data FROM products WHERE id=?').get(id));
   const getOrder = id => parse(db.prepare('SELECT data FROM orders WHERE id=?').get(id));
+  const cardOf = shopId => db.prepare('SELECT number, holder, bank FROM shop_cards WHERE shop_id=?').get(shopId) || null;
+  const withPayment = order => decorateOrder(order, cardOf(order.shopId));
   function saveOrder(order) { db.prepare('UPDATE orders SET data=? WHERE id=?').run(JSON.stringify(order), order.id); }
   function changeStatus(order, status) {
     if (!Object.hasOwn(transitions, status)) throw new Error('Buyurtma holati noto‘g‘ri.');
     if (order.status === status) return order;
     if (!transitions[order.status].includes(status)) throw new Error('Bu holatga o‘tish mumkin emas.');
+    const gate = advanceCheck(order, status);
+    if (!gate.ok) throw Object.assign(new Error(gate.error), { status: 409 });
     db.exec('BEGIN IMMEDIATE');
     try {
       if (status === 'cancelled') order.items.forEach(item => {
@@ -120,6 +125,8 @@ export function createApp(config = {}) {
       if (!checked.ok) return res.status(409).json({ error: checked.error });
       chosen = checked;
     } else if (!openNow && input.customer.deliveryTime !== 'tomorrow') return res.status(409).json({ error: `Do‘kon hozir yopiq (ish vaqti ${hoursLabel(shop.hours)}). Ertangi yetkazish uchun buyurtma bering.` });
+    const payment = choosePayment(input.payment, shop, chosen?.delivery.method || 'delivery');
+    if (!payment.ok) return res.status(409).json({ error: payment.error });
     if (!demo && (!botToken || !shopChatId(shop.id))) return res.status(503).json({ error: 'Do‘konning buyurtma qabul qilish kanali hali ulanmagan.' });
     // Aggregate duplicates before checking stock; prices always come from the server.
     const quantities = new Map();
@@ -136,7 +143,7 @@ export function createApp(config = {}) {
       });
       const subtotal = items.reduce((s, i) => s + i.price * i.quantity, 0);
       const order = { id: randomUUID(), customerId: req.customer.id, shopId: shop.id, shopName: shop.name,
-        items, subtotal, ...(chosen ? { delivery: chosen.delivery } : {}),
+        items, subtotal, payment: payment.payment, ...(chosen ? { delivery: chosen.delivery } : {}),
         customer: { ...input.customer, ...(chosen ? { deliveryTime: chosen.legacy } : {}), ...(chosen?.delivery.method === 'pickup' ? { address: `Olib ketish: ${shop.address}` } : {}) },
         deliveryFee: chosen?.delivery.method === 'pickup' ? 0 : shop.deliveryFee, total: subtotal + (chosen?.delivery.method === 'pickup' ? 0 : shop.deliveryFee),
         status: 'pending', demo, createdAt: placedAt.toISOString(), notification: demo ? 'demo' : 'queued',
@@ -148,7 +155,18 @@ export function createApp(config = {}) {
   });
   app.get('/api/orders', customer, (req, res) => {
     const reviewed = new Set(db.prepare('SELECT order_id FROM reviews WHERE customer_id=?').all(req.customer.id).map(r => r.order_id));
-    res.json(db.prepare('SELECT data FROM orders WHERE customer_id=? ORDER BY created_at DESC').all(req.customer.id).map(parse).map(o => ({ ...o, reviewed: reviewed.has(o.id) })));
+    res.json(db.prepare('SELECT data FROM orders WHERE customer_id=? ORDER BY created_at DESC').all(req.customer.id).map(parse).map(o => ({ ...withPayment(o), reviewed: reviewed.has(o.id) })));
+  });
+  // "I paid": the buyer tells the shop the transfer was sent
+  app.post('/api/orders/:id/payment', customer, (req, res) => {
+    const order = parse(db.prepare('SELECT data FROM orders WHERE id=? AND customer_id=?').get(req.params.id, req.customer.id));
+    if (!order) return res.status(404).json({ error: 'Buyurtma topilmadi.' });
+    const body = paymentClaimSchema.safeParse(req.body || {});
+    if (!body.success) return res.status(400).json({ error: body.error.issues[0].message });
+    const claimed = claimPayment(order, body.data.note, new Date());
+    if (!claimed.ok) return res.status(409).json({ error: claimed.error });
+    saveOrder(claimed.order);
+    res.json(withPayment(claimed.order));
   });
   app.post('/api/orders/:id/cancel', customer, (req, res) => {
     const order = parse(db.prepare('SELECT data FROM orders WHERE id=? AND customer_id=?').get(req.params.id, req.customer.id));
@@ -203,12 +221,43 @@ export function createApp(config = {}) {
     res.json(updated);
   });
   app.get('/api/merchant/:shopId/orders', merchant, (req, res) => {
-    res.json(db.prepare("SELECT data FROM orders WHERE json_extract(data,'$.shopId')=? ORDER BY created_at DESC LIMIT 100").all(req.shopId).map(parse));
+    res.json(db.prepare("SELECT data FROM orders WHERE json_extract(data,'$.shopId')=? ORDER BY created_at DESC LIMIT 100").all(req.shopId).map(parse).map(withPayment));
   });
   app.patch('/api/merchant/:shopId/orders/:id', merchant, (req, res) => {
     const order = getOrder(req.params.id);
     if (!order || order.shopId !== req.shopId) return res.status(404).json({ error: 'Buyurtma topilmadi.' });
-    try { res.json(changeStatus(order, req.body.status)); } catch (e) { res.status(400).json({ error: e.message }); }
+    try { res.json(withPayment(changeStatus(order, req.body.status))); } catch (e) { res.status(e.status || 400).json({ error: e.message }); }
+  });
+  // the shop says whether the transfer arrived (or that the money was handed back after a cancellation)
+  app.post('/api/merchant/:shopId/orders/:id/payment', merchant, (req, res) => {
+    const order = getOrder(req.params.id);
+    if (!order || order.shopId !== req.shopId) return res.status(404).json({ error: 'Buyurtma topilmadi.' });
+    const body = paymentDecisionSchema.safeParse(req.body);
+    if (!body.success) return res.status(400).json({ error: 'Amal noto‘g‘ri.' });
+    const decided = decidePayment(order, body.data.action, new Date());
+    if (!decided.ok) return res.status(409).json({ error: decided.error });
+    saveOrder(decided.order);
+    res.json(withPayment(decided.order));
+  });
+  app.get('/api/merchant/:shopId/payment', merchant, (req, res) => {
+    const shop = getShop(req.shopId);
+    if (!shop) return res.status(404).json({ error: 'Do‘kon topilmadi.' });
+    res.json({ acceptsCard: !!shop.acceptsCard, delivery: shop.delivery || 'own', card: cardOf(shop.id) });
+  });
+  app.put('/api/merchant/:shopId/payment', merchant, (req, res) => {
+    const shop = getShop(req.shopId);
+    if (!shop) return res.status(404).json({ error: 'Do‘kon topilmadi.' });
+    const parsed = paymentSettingsSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0].message });
+    const card = parsed.data.card || cardOf(shop.id);
+    if (parsed.data.acceptsCard && !card) return res.status(400).json({ error: 'Kartaga o‘tkazmani yoqish uchun karta ma’lumotlarini kiriting.' });
+    db.exec('BEGIN IMMEDIATE');
+    try {
+      db.prepare('UPDATE shops SET data=? WHERE id=?').run(JSON.stringify({ ...shop, acceptsCard: parsed.data.acceptsCard, delivery: parsed.data.delivery }), shop.id);
+      if (parsed.data.card) db.prepare(SAVE_CARD_SQL).run(shop.id, parsed.data.card.number, parsed.data.card.holder, parsed.data.card.bank, new Date().toISOString());
+      db.exec('COMMIT');
+    } catch (e) { db.exec('ROLLBACK'); return res.status(500).json({ error: 'Saqlab bo‘lmadi.' }); }
+    res.json({ acceptsCard: parsed.data.acceptsCard, delivery: parsed.data.delivery, card });
   });
   app.post('/api/merchant/:shopId/products', merchant, (req, res) => {
     if (!getShop(req.shopId)) return res.status(404).json({ error: 'Do‘kon topilmadi.' });

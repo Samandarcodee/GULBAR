@@ -1,6 +1,7 @@
 // Delivery / pick-up windows, greeting cards and the text a shop receives. Shared by the Node server, the Worker and the app,
 // so the screen and the server always agree on which times can be chosen. All times are Tashkent time (UTC+5).
 import { isOpen, nextOpen, hoursLabel, toMinutes } from './hours.js';
+import { paymentLines } from './payment.js';
 
 export const LEAD_MINUTES = 60;
 export const MAX_DAYS = 14;
@@ -88,7 +89,7 @@ export function shopOrderText(order, now = new Date()) {
   const lines = [
     `GulBar · #${order.id.slice(0, 8)}`, items,
     pickup ? 'Do‘kondan olib ketadi (yetkazish yo‘q)' : `Yetkazish: ${money(order.deliveryFee)} so‘m`,
-    `Jami: ${money(order.total)} so‘m`, 'To‘lov yetkazilganda',
+    `Jami: ${money(order.total)} so‘m`, ...paymentLines(order),
     `Buyurtmachi: ${c.name}, ${c.phone}`,
     pickup ? `Olib ketuvchi: ${c.recipient}, ${c.recipientPhone}` : `Qabul qiluvchi: ${c.recipient}, ${c.recipientPhone}`,
     pickup ? 'Manzil: do‘kon ichida topshiriladi' : `Manzil: ${c.address}`,

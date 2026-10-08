@@ -1,6 +1,7 @@
 // Complaints, questions and suggestions from buyers. Works on the same `store` abstraction as accounts.js,
 // so the Node server and the Cloudflare Worker share one implementation.
 import { z } from 'zod';
+import { telegramUserId } from './auth.js';
 export const kindNames = { complaint: 'Shikoyat', question: 'Savol', suggestion: 'Taklif' };
 export const supportSchema = z.object({
   kind: z.enum(['complaint', 'question', 'suggestion']),
@@ -48,7 +49,7 @@ export async function adminList(store) {
     const order = r.order_data ? JSON.parse(r.order_data) : null;
     return { id: r.id, kind: r.kind, message: r.message, status: r.status, reply: r.reply, createdAt: r.created_at,
       orderShort: order ? order.id.slice(0, 8) : '', shopName: order?.shopName || '', contact: order ? `${order.customer.name}, ${order.customer.phone}` : '',
-      canReplyInTelegram: /^\d{1,16}$/.test(r.customer_id) };
+      canReplyInTelegram: !!telegramUserId(r.customer_id) };
   }) };
 }
 
@@ -60,7 +61,8 @@ export async function adminUpdate(store, id, body, hooks = {}) {
   const reply = parsed.data.reply ?? row.reply;
   const status = parsed.data.status ?? (parsed.data.reply ? 'done' : row.status);
   await store.batch([['UPDATE support_tickets SET status=?, reply=?, updated_at=? WHERE id=?', [status, reply, new Date().toISOString(), id]]]);
-  if (reply && reply !== row.reply && hooks.notify) await hooks.notify(row.customer_id, `GulBar yordam xizmati javobi:\n\n${reply}`);
+  const chat = telegramUserId(row.customer_id);
+  if (reply && reply !== row.reply && hooks.notify && chat) await hooks.notify(chat, `GulBar yordam xizmati javobi:\n\n${reply}`);
   return { status: 200, data: { id, status, reply } };
 }
 

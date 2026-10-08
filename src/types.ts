@@ -1,4 +1,4 @@
-export type Shop = { id: string; name: string; subtitle: string; address: string; deliveryFee: number; deliveryTime: string; color: string; initials: string; active: boolean; logo?: string; phone?: string; rating?: { avg: number; count: number }; hours?: { open: string; close: string } | null };
+export type Shop = { acceptsCard?: boolean; delivery?: 'own' | 'taxi'; id: string; name: string; subtitle: string; address: string; deliveryFee: number; deliveryTime: string; color: string; initials: string; active: boolean; logo?: string; phone?: string; rating?: { avg: number; count: number }; hours?: { open: string; close: string } | null };
 export type Product = { id: string; shopId: string; name: string; description: string; price: number; category: string; image: string; stock: number; badge: string; active?: boolean; audience?: string[]; images?: string[] };
 export type MerchantWorkspace = { shop: Shop; products: Product[] };
 export type AccountUser = { id: string; login: string; role: 'admin' | 'merchant'; shopId: string | null; mustChangePassword: boolean };
@@ -7,7 +7,9 @@ export type AdminShop = Shop & { phone: string; telegramChatId: string; login: s
 export type CartItem = { productId: string; quantity: number };
 export type Delivery = { method: 'delivery' | 'pickup'; when: 'asap' | 'slot'; date?: string; from?: string; to?: string; point?: { lat: number; lng: number } };
 export type Customer = { cardStyle?: string; cardFrom?: string; name: string; phone: string; recipient: string; recipientPhone: string; address: string; deliveryTime: 'soon' | 'today-evening' | 'tomorrow'; note: string; anonymous: boolean };
-export type Order = { id: string; shopId: string; shopName: string; items: (CartItem & { name: string; image: string; price: number })[]; customer: Customer; total: number; subtotal: number; deliveryFee: number; status: string; demo: boolean; createdAt: string; notification: string; reviewed?: boolean; afterHours?: boolean; respondFrom?: string; delivery?: Delivery; cancelledBy?: string; cancelReason?: 'customer' | 'shop' | 'expired' };
+export type Order = { id: string; shopId: string; shopName: string; items: (CartItem & { name: string; image: string; price: number })[]; customer: Customer; total: number; subtotal: number; deliveryFee: number; status: string; demo: boolean; createdAt: string; notification: string; reviewed?: boolean; afterHours?: boolean; respondFrom?: string; delivery?: Delivery; cancelledBy?: string; cancelReason?: 'customer' | 'shop' | 'expired' | 'unpaid'; payment?: Payment; payInfo?: PayInfo | null; refundDue?: boolean };
+export type Payment = { method: 'cash' | 'card'; status: 'none' | 'unpaid' | 'claimed' | 'confirmed'; claimedAt?: string; confirmedAt?: string; rejectedAt?: string; refundedAt?: string; note?: string };
+export type PayInfo = { card: string; holder: string; bank: string; amount: number; cash: number; dueAt: number; state: 'unpaid' | 'claimed' };
 export type Catalog = { shops: Shop[]; products: Product[]; demo: boolean; merchantProtected?: boolean };
 declare global {
   interface Window {

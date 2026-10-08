@@ -78,6 +78,61 @@ if (token) {
   assert.equal(await stockOf(), before, 'the shop cancel gives the flowers back too');
 }
 
+// paying the shop by card transfer: private card, card shown only after accepting, delivery waits for confirmed money
+if (token) {
+  const CARD = { number: '8600 1234 5678 9012', holder: 'Madina Karimova', bank: 'Uzum Bank' };
+  const shopCall = (path, method, body) => call(`/merchant/lola${path}`, method, body, user, token);
+  const cardOrder = async () => { const r = await call('/orders', 'POST', { requestKey: randomUUID(), shopId: 'lola', items: [{ productId: product.id, quantity: 1 }], customer: customer(), delivery: { method: 'delivery', when: 'asap' }, payment: { method: 'card' } }); assert.equal(r.status, 201, JSON.stringify(r.data)); return r.data; };
+  const view = async id => (await call('/orders')).data.find(o => o.id === id);
+
+  assert.equal((await shopCall('/payment', 'PUT', { acceptsCard: true, delivery: 'own' })).status, 400, 'accepting cards needs a card');
+  assert.equal((await shopCall('/payment', 'PUT', { acceptsCard: true, delivery: 'own', card: { ...CARD, number: '8600 1234 5678 9013' } })).status, 400, 'a mistyped number is refused');
+  const saved = await shopCall('/payment', 'PUT', { acceptsCard: true, delivery: 'own', card: CARD });
+  assert.equal(saved.status, 200, JSON.stringify(saved.data));
+  const publicCatalog = JSON.stringify((await call('/catalog')).data);
+  assert.ok(publicCatalog.includes('"acceptsCard":true') && !publicCatalog.includes('8600123456789012') && !publicCatalog.includes('Madina Karimova'), 'the card never appears in the catalog');
+
+  const paid = await cardOrder();
+  assert.deepEqual(paid.payment, { method: 'card', status: 'unpaid' });
+  assert.equal((await view(paid.id)).payInfo, null, 'no card before the shop accepts');
+  assert.equal((await shopCall(`/orders/${paid.id}`, 'PATCH', { status: 'accepted' })).status, 200);
+  const waiting = (await view(paid.id)).payInfo;
+  assert.equal(waiting.card, '8600123456789012');
+  assert.equal(waiting.amount, product.price);
+  assert.equal(waiting.cash, 20000);
+  assert.ok(waiting.dueAt > Date.now());
+  const early = await shopCall(`/orders/${paid.id}`, 'PATCH', { status: 'delivering' });
+  assert.equal(early.status, 409);
+  assert.match(early.data.error, /pul tushganini tasdiqlang/i);
+  assert.equal((await call(`/orders/${paid.id}/payment`, 'POST', {}, randomUUID())).status, 404, 'only the buyer can say "I paid"');
+  assert.equal((await call(`/orders/${paid.id}/payment`, 'POST', { note: '4521' })).data.payment.status, 'claimed');
+  assert.equal((await call(`/orders/${paid.id}/payment`, 'POST', {})).status, 409, 'a second tap is refused');
+  assert.equal((await shopCall(`/orders/${paid.id}/payment`, 'POST', { action: 'reject' })).data.payment.status, 'unpaid');
+  assert.equal((await call(`/orders/${paid.id}/payment`, 'POST', {})).status, 200);
+  assert.equal((await shopCall(`/orders/${paid.id}/payment`, 'POST', { action: 'confirm' })).data.payment.status, 'confirmed');
+  assert.equal((await view(paid.id)).payInfo, null);
+  assert.equal((await shopCall(`/orders/${paid.id}`, 'PATCH', { status: 'delivering' })).status, 200);
+  assert.equal((await shopCall(`/orders/${paid.id}`, 'PATCH', { status: 'delivered' })).status, 200);
+
+  // taxi shops: cash delivery is refused, the flowers are paid by card and only the ride is cash
+  assert.equal((await shopCall('/payment', 'PUT', { acceptsCard: true, delivery: 'taxi' })).status, 200);
+  const cashTaxi = await order({ method: 'delivery', when: 'asap' });
+  assert.equal(cashTaxi.status, 409, 'cash delivery is refused in taxi mode');
+  assert.match(cashTaxi.data.error, /taksi/i);
+  const taxiCard = await cardOrder();
+  assert.equal((await call(`/orders/${taxiCard.id}/cancel`, 'POST')).status, 200);
+  assert.equal((await shopCall('/payment', 'PUT', { acceptsCard: true, delivery: 'own' })).status, 200);
+
+  // a shop cancels after the money arrived: flagged for a refund until the shop marks it returned
+  const refunded = await cardOrder();
+  await shopCall(`/orders/${refunded.id}`, 'PATCH', { status: 'accepted' });
+  await shopCall(`/orders/${refunded.id}/payment`, 'POST', { action: 'confirm' });
+  assert.equal((await shopCall(`/orders/${refunded.id}`, 'PATCH', { status: 'cancelled' })).status, 200);
+  assert.equal((await view(refunded.id)).refundDue, true);
+  assert.equal((await shopCall(`/orders/${refunded.id}/payment`, 'POST', { action: 'refunded' })).status, 200);
+  assert.equal((await view(refunded.id)).refundDue, false);
+}
+
 // support: validation, ownership, privacy, daily limit, closed admin routes
 assert.equal((await call('/support', 'POST', { kind: 'complaint', message: 'ab' })).status, 400);
 const note = await call('/support', 'POST', { kind: 'complaint', message: 'Buyurtma kech yetib keldi', orderId: b.data.id });

@@ -5,6 +5,7 @@ import { shops, products } from './catalog.js';
 import { imageTableSql } from './images.js';
 import { reviewsTableSql } from './reviews.js';
 import { supportTableSql } from './support.js';
+import { shopCardsTableSql } from './payment.js';
 
 export function openDatabase(path, demo) {
   if (path !== ':memory:') mkdirSync(dirname(path), { recursive: true });
@@ -28,6 +29,7 @@ export function openDatabase(path, demo) {
   db.exec(imageTableSql);
   db.exec(reviewsTableSql);
   db.exec(supportTableSql);
+  db.exec(shopCardsTableSql);
   const mode = db.prepare("SELECT value FROM metadata WHERE key='mode'").get();
   const hadRows = db.prepare('SELECT id FROM shops LIMIT 1').get();
   if ((!demo && (mode?.value === 'demo' || (!mode && hadRows))) || (demo && mode?.value === 'live')) {

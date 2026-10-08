@@ -30,4 +30,6 @@ The owner often works from a phone, so end every task with: what changed, how it
 - Orders expire after 30 minutes without an answer (`PENDING_EXPIRY_MINUTES`); a cron runs every minute.
 - Telegram sign-in data (`initData`) is accepted for 24 hours. Shop-owner and admin accounts use login + password; sessions last 8 hours.
 - A shop cannot be deleted while it has pending, accepted or delivering orders.
+- **Card-transfer payments** (`server/payment.js` holds all rules): the buyer pays the shop's own card (no payment provider; GulBar never touches the money). The card is stored in the `shop_cards` table and shown to the buyer only after the shop accepts. The card covers the flowers (`subtotal`); the delivery fee is always cash for the driver. Shops with `delivery: 'taxi'` require card payment for delivery orders. A card order can't go out for delivery until the shop confirms the money. `payment.status`: unpaid → claimed ("To'ladim") → confirmed; an unpaid accepted order is cancelled after `PAYMENT_DUE_MINUTES` (default 30; `updatedAt` marks the window start).
+- Buyer Telegram ids are stored as `tg:<id>`; use `telegramUserId()` from `server/auth.js` to get the chat id (a past bug sent nothing because the prefix was not stripped).
 - Preview URLs of non-production branches use the REAL database: never place test orders there.

@@ -15,6 +15,7 @@ export const orderSchema = z.object({
     deliveryTime: z.enum(['soon', 'today-evening', 'tomorrow']), note: z.string().trim().max(500).default(''), anonymous: z.boolean().default(false),
     cardStyle: z.enum(cardStyles).default('classic'), cardFrom: z.string().trim().max(40).default('') }),
   delivery: deliveryInputSchema.optional(),
+  payment: z.object({ method: z.enum(['cash', 'card']) }).optional(),
 });
 export const audiences = ['ona', 'rafiqa', 'qiz', 'dost', 'hamkasb'];
 const imageRef = z.string().max(2048).refine(v => /^\/api\/images\/[a-f0-9-]{36}$/.test(v) || /^\/images\/[a-zA-Z0-9-]+\.(jpg|png|webp)$/.test(v) || (v.startsWith('https://') && URL.canParse(v)), 'Rasm tanlang yoki HTTPS rasm manzilini kiriting.');

@@ -10,6 +10,8 @@ async function checkoutStart(page: Page) {
 test('first prices are visible on a phone without scrolling', async ({ page }) => {
   await page.setViewportSize(phone);
   await page.goto('/');
+  // the demo ribbon exists only in demo mode; the real app has that much more room
+  await page.locator('.demo-bar').evaluate(e => e.remove()).catch(() => {});
   const price = page.locator('.gm-price').first();
   await expect(price).toBeVisible();
   const box = (await price.boundingBox())!;

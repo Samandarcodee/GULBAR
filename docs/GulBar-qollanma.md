@@ -68,6 +68,7 @@ Istalgan vaqtda (yetkazilgunga qadar): `Bekor qilindi`.
 - **Aniq sana va vaqt oralig'i:** 14 kun ichidan kun va 2 soatlik oraliq tanlanadi; oraliqlar do'konning ish vaqtiga qarab o'zi cheklanadi. «Imkon qadar tezroq» faqat do'kon ochiq bo'lsa.
 - **Xarita nuqtasi:** manzilni xaritada belgilash yoki «Mening joylashuvim» (ixtiyoriy). Nuqta do'kon Telegramiga xarita sifatida ham boradi. Xarita: OpenStreetMap.
 - **Tabrik kartasi:** 5 ta uslub (Klassik, Atirgul, Oltin, Bahor, Minimal), tayyor tilaklar, «Kimdan» maydoni va jonli ko'rinish; do'kon kartani aynan shu ko'rinishda ko'radi.
+- **To'lov:** naqd (yetkazilganda yoki olib ketganda) yoki **kartaga o'tkazma** (do'kon yoqqan bo'lsa). Kartaga o'tkazmada do'kon buyurtmani qabul qilgach xaridor ilovada (va Telegramda) karta raqamini ko'radi, gullar uchun summani o'tkazadi va «To'ladim» tugmasini bosadi. Do'kon pul tushganini tasdiqlaydi. Muddat 30 daqiqa, o'tmasa buyurtma bekor bo'ladi. **Yo'l haqi har doim yetkazgan haydovchiga naqd beriladi.** GulBar pulga tegmaydi, pul to'g'ridan-to'g'ri do'kon kartasiga tushadi.
 - **Buyurtmalarim:** holat chizig'i, tanlangan vaqt, **Bekor qilish** (faqat do'kon hali qabul qilmagan buyurtma uchun; gullar do'konga qaytadi), **Baho berish**, **Qayta buyurtma**, **Shikoyat / yordam**.
 - **Yordam (Profil):** tez-tez so'raladigan savollar, «Yordamga yozish» (shikoyat, savol, taklif) va o'z murojaatlari bilan javoblar. Kuniga 5 tagacha murojaat. Admin paneldagi «Murojaatlar» bo'limida javob beriladi, javob xaridorning Telegramiga ham boradi.
 - **Sevimlilar**, qorong'i rejim va Telegram mavzusiga moslik.
@@ -90,6 +91,8 @@ Istalgan vaqtda (yetkazilgunga qadar): `Bekor qilindi`.
 - **Ko'rinadi / Yashirin** tugmasi: gul vaqtincha yo'q bo'lsa yashiriladi.
 - **Do'kon sozlamalari:** yetkazish haqi, muddati, do'kon ochiq/yopiq.
 - **Buyurtmalar:** qidirish, holat bo'yicha filtr, bugungi ko'rsatkichlar.
+- **To'lov va yetkazish usuli** («Do'kon sozlamalari» ichida): kartaga o'tkazmani yoqish (karta raqami, egasi, bank) va «O'z kuryerim» yoki «Taksi bilan». Karta ochiq katalogda ko'rinmaydi, o'zgartirilsa administratorga xabar boradi. **Taksi bilan** tanlansa, gullar pulini xaridor oldindan kartaga o'tkazadi, haydovchiga faqat yo'l haqi naqd beriladi.
+- **Kartaga to'langan buyurtma:** qabul qilgach xaridorga karta ko'rsatiladi. U «To'ladim» desa, bank ilovangizda tekshirib **«Pul tushdi»** yoki **«Tushmadi»** bosasiz (Telegramdagi xabarda ham shu tugmalar bor). Pul tasdiqlanmaguncha «Yo'lda» tugmasi ishlamaydi. Bekor qilsangiz va pul allaqachon tushgan bo'lsa, uni qaytarib «Qaytardim» ni bosasiz.
 - **Asosiy ish Telegram'da:** buyurtma xabari kelganda «Qabul qilish» tugmasini bosish yetarli.
 
 **Slaydga:** "Boshlash — 4 qadam" va "Kundalik — 4 amal".
