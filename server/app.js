@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { orderSchema, productSchema, shopSchema, shopSettingsSchema, transitions, statusNames } from './schemas.js';
 export { statusNames } from './schemas.js';
 import { openDatabase } from './db.js';
-import { secureEqual, validateTelegram } from './auth.js';
+import { roleFor, secureEqual, validateTelegram } from './auth.js';
 import { commandReply, telegramParameters } from './telegram-commands.js';
 import { isOpen, nextOpen, hoursLabel } from './hours.js';
 import { validateDelivery, shopOrderText } from './delivery.js';
@@ -152,6 +152,13 @@ export function createApp(config = {}) {
       if (!demo) db.prepare('INSERT INTO outbox(order_id,chat_id) VALUES (?, ?)').run(order.id, String(shopChatId(shop.id)));
       db.exec('COMMIT'); res.status(201).json(order);
     } catch (e) { db.exec('ROLLBACK'); res.status(400).json({ error: e.message }); }
+  });
+  // which panel links this person may see; the panels themselves still ask for a login
+  app.get('/api/me', customer, (req, res) => {
+    if (demo) return res.json({ admin: true, shops: db.prepare('SELECT id FROM shops').all().map(s => s.id) });
+    const rows = db.prepare('SELECT shop_id, chat_id FROM shop_private').all().map(r => ({ shop_id: r.shop_id, chat_id: r.chat_id }));
+    for (const [shop_id, chat_id] of Object.entries(chatIds)) if (!rows.some(r => r.shop_id === shop_id)) rows.push({ shop_id, chat_id: String(chat_id) });
+    res.json(roleFor(req.customer.id, config.adminChatId, rows));
   });
   app.get('/api/orders', customer, (req, res) => {
     const reviewed = new Set(db.prepare('SELECT order_id FROM reviews WHERE customer_id=?').all(req.customer.id).map(r => r.order_id));

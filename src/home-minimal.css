@@ -51,16 +51,6 @@
 .gm-shop.on .gm-shop-name { color: var(--text); font-weight: 600; }
 @media (hover: hover) { .gm-shop:hover .gm-shop-face { transform: scale(1.06); } .gm-shop:hover .gm-shop-name { color: var(--text); } }
 
-/* who is it for */
-.gm-bar { position: sticky; top: 0; z-index: 12; margin-top: 18px; background: var(--bg); box-shadow: 0 0 0 100vmax var(--bg); clip-path: inset(0 -100vmax); }
-.gm-chips { display: flex; gap: 8px; padding: 8px 0; overflow-x: auto; scrollbar-width: none; -webkit-mask: linear-gradient(90deg, #000 calc(100% - 28px), transparent); mask: linear-gradient(90deg, #000 calc(100% - 28px), transparent); padding-right: 24px; }
-.gm-chips::-webkit-scrollbar { display: none; }
-.gm-chip { position: relative; isolation: isolate; flex-shrink: 0; min-height: 44px; padding: 0 18px; border: 1px solid var(--line); border-radius: 22px; background: var(--surface); color: var(--text); font-size: 14px; font-weight: 500; transition: color .25s, border-color .25s; }
-.gm-chip > span:not(.gm-chip-bg) { position: relative; }
-.gm-chip-bg { position: absolute; inset: -1px; z-index: -1; border-radius: 22px; background: var(--text); }
-.gm-chip.on { color: var(--bg); border-color: transparent; }
-@media (hover: hover) { .gm-chip:not(.on):hover { border-color: var(--text); } }
-
 .gm-count { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin: 22px 0 16px; }
 .gm-count h2 { font-family: var(--display); font-weight: 420; font-size: clamp(24px, 2.2vw + 14px, 34px); letter-spacing: -.03em; line-height: 1.1; }
 .gm-count p { font-size: 14px; color: var(--muted); }
@@ -112,8 +102,7 @@
   .gm-shop-ring { width: 84px; height: 84px; }
   .gm-shop-face { width: 76px; height: 76px; }
   .gm-shop-name { font-size: 13px; }
-  .gm-chips { -webkit-mask: none; mask: none; flex-wrap: wrap; padding-right: 0; }
-  .gm-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 44px 22px; }
+    .gm-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 44px 22px; }
   .gm-name { font-size: 26px; }
   .gm-price { font-size: 15px; }
 }
@@ -124,7 +113,6 @@
   .gm-title { grid-column: 1; }
   .gm-quote { grid-column: 1; min-height: calc(1.25em * 2); }
   .gm-sub { grid-column: 2; grid-row: 2 / span 2; align-self: end; justify-self: end; margin: 0 0 14px; }
-  .gm-bar { position: static; clip-path: none; box-shadow: none; background: none; }
   .gm-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 56px 26px; }
 }
 @media (prefers-reduced-motion: reduce) {

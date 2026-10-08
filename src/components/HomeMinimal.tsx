@@ -9,14 +9,10 @@ import { RatingLine } from './Reviews';
 import { shopStatus, useNow } from '../lib/hours-ui';
 import { Dialog } from './Dialog';
 
-const people = [
-  { id: '', label: 'Hammasi' }, { id: 'ona', label: 'Onamga' }, { id: 'rafiqa', label: 'Rafiqamga' },
-  { id: 'qiz', label: 'Qizimga' }, { id: 'dost', label: 'Do‘stimga' }, { id: 'hamkasb', label: 'Hamkasbimga' },
-];
 const ease = [0.22, 1, 0.36, 1] as const;
 
-export type HomeFilters = { who: string; q: string; sort: 'recommended' | 'low' | 'high'; budget: string };
-export const noFilters: HomeFilters = { who: '', q: '', sort: 'recommended', budget: '' };
+export type HomeFilters = { q: string; sort: 'recommended' | 'low' | 'high'; budget: string };
+export const noFilters: HomeFilters = { q: '', sort: 'recommended', budget: '' };
 const budgets = [
   { id: 'b1', label: '500 000 gacha', min: 0, max: 500000 }, { id: 'b2', label: '500 000 – 1 mln', min: 500000, max: 1000000 },
   { id: 'b3', label: '1 – 2 mln', min: 1000000, max: 2000000 }, { id: 'b4', label: '2 mln dan yuqori', min: 2000000, max: Infinity },
@@ -26,7 +22,6 @@ const sorts = [{ id: 'recommended', label: 'Tavsiya etilgan' }, { id: 'low', lab
 export function readFilters(raw: unknown): HomeFilters {
   const v = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
   return {
-    who: people.some(p => p.id === v.who) ? String(v.who) : '',
     q: typeof v.q === 'string' ? v.q.slice(0, 60) : '',
     sort: sorts.some(o => o.id === v.sort) ? v.sort as HomeFilters['sort'] : 'recommended',
     budget: budgets.some(b => b.id === v.budget) ? String(v.budget) : '',
@@ -129,19 +124,19 @@ export function HomeMinimal({ catalog, favorites, cart, shopFilter, setShopFilte
   const [own, setOwn] = useState<HomeFilters>(noFilters);
   const filters = given || own;
   const setFilters = setGiven || setOwn;
-  const { who, q: search, sort, budget } = filters;
+  const { q: search, sort, budget } = filters;
   const patch = (part: Partial<HomeFilters>) => setFilters({ ...filters, ...part });
   const [sheet, setSheet] = useState(false);
   const { fly, layer } = useFly();
 
   const needle = plain(search.trim());
   const tier = budgets.find(b => b.id === budget);
-  const matches = products.filter(p => (!who || !p.audience?.length || p.audience.includes(who)) && (shopFilter === 'all' || p.shopId === shopFilter)
+  const matches = products.filter(p => (shopFilter === 'all' || p.shopId === shopFilter)
     && (!tier || (p.price >= tier.min && p.price < tier.max))
     && (!needle || plain(`${p.name} ${shops.find(s => s.id === p.shopId)?.name || ''}`).includes(needle)));
   const list = sort === 'recommended' ? matches : [...matches].sort((a, b) => sort === 'low' ? a.price - b.price : b.price - a.price);
   const narrowed = sort !== 'recommended' || !!budget;
-  const filtered = !!who || shopFilter !== 'all' || !!needle || narrowed;
+  const filtered = shopFilter !== 'all' || !!needle || narrowed;
   const reset = () => { setFilters(noFilters); setShopFilter('all'); };
   const shopName = shops.find(s => s.id === shopFilter)?.name;
 
@@ -172,15 +167,6 @@ export function HomeMinimal({ catalog, favorites, cart, shopFilter, setShopFilte
         {search && <button type="button" className="gm-search-clear" aria-label="Qidiruvni tozalash" onClick={() => patch({ q: '' })}><X size={15} /></button>}
       </label>
       <button type="button" className={`gm-filter-btn${narrowed ? ' on' : ''}`} onClick={() => setSheet(true)} aria-label={narrowed ? 'Saralash va narx (tanlangan)' : 'Saralash va narx'}><SlidersHorizontal size={17} aria-hidden="true" /><span>Narx</span></button>
-    </div>
-
-    <div className="gm-bar">
-      <div className="gm-chips" role="group" aria-label="Gul kimga?">
-        {people.map(p => <button key={p.id || 'all'} className={`gm-chip${who === p.id ? ' on' : ''}`} aria-pressed={who === p.id} onClick={() => { haptic(); patch({ who: p.id }); }}>
-          {who === p.id && <motion.span layoutId="gm-chip-bg" className="gm-chip-bg" transition={{ type: 'spring', stiffness: 440, damping: 38 }} />}
-          <span>{p.label}</span>
-        </button>)}
-      </div>
     </div>
 
     <div className="gm-count">

@@ -1,6 +1,6 @@
 import { Hono, type Context, type MiddlewareHandler } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
-import { secureEqual, telegramUserId, validateTelegram } from '../server/auth.js';
+import { roleFor, secureEqual, telegramUserId, validateTelegram } from '../server/auth.js';
 import { commandReply, telegramParameters } from '../server/telegram-commands.js';
 import { isOpen, nextOpen, hoursLabel } from '../server/hours.js';
 import { validateDelivery, shopOrderText } from '../server/delivery.js';
@@ -58,6 +58,7 @@ const customer: MiddlewareHandler<Bindings> = async (c, next) => {
   } catch { return c.json({ error: 'Telegram orqali qayta kiring.' }, 401); }
   await next();
 };
+app.use('/api/me', customer);
 app.use('/api/orders', customer);
 app.use('/api/orders/:id/review', customer);
 app.use('/api/orders/:id/cancel', customer);
@@ -106,6 +107,13 @@ app.get('/api/catalog', async c => {
   const active = new Set(shops.map(s => s.id));
   const products = result[1].results.map((r: Row) => decode<Product>(r)!).filter((p: Product) => active.has(p.shopId) && p.active !== false);
   return c.json({ shops, products, demo: demo(c.env), merchantProtected: true });
+});
+// which panel links this person may see; the panels themselves still ask for a login
+app.get('/api/me', async c => {
+  if (demo(c.env)) return c.json({ admin: true, shops: (await c.env.DB.prepare('SELECT id FROM shops').all<{ id: string }>()).results.map(r => r.id) });
+  const rows = (await c.env.DB.prepare('SELECT shop_id, chat_id FROM shop_private').all<{ shop_id: string; chat_id: string }>()).results;
+  for (const [shop_id, chat_id] of Object.entries(mapping(c.env.SHOP_CHAT_IDS))) if (!rows.some(r => r.shop_id === shop_id)) rows.push({ shop_id, chat_id: String(chat_id) });
+  return c.json(roleFor(c.get('customerId'), c.env.ADMIN_CHAT_ID, rows));
 });
 app.get('/api/orders', async c => {
   const result = await c.env.DB.prepare('SELECT data FROM orders WHERE customer_id=? ORDER BY created_at DESC LIMIT 100').bind(c.get('customerId')).all<Row>();

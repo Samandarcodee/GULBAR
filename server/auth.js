@@ -14,6 +14,19 @@ export function telegramUserId(customerId) {
   return match ? match[1] : '';
 }
 
+/**
+ * What the signed-in Telegram user may be shown: the admin link for the admin, the shop-panel link for shop owners.
+ * This only decides which links appear; the panels themselves still ask for a login.
+ * @param {string | undefined} customerId stored as `tg:<id>`
+ * @param {string | undefined} adminChatId the admin's Telegram id (ADMIN_CHAT_ID)
+ * @param {{ shop_id: string, chat_id: string }[]} shopChats
+ */
+export function roleFor(customerId, adminChatId, shopChats) {
+  const id = telegramUserId(customerId);
+  if (!id) return { admin: false, shops: /** @type {string[]} */ ([]) };
+  return { admin: !!adminChatId && id === String(adminChatId), shops: shopChats.filter(s => s.chat_id && String(s.chat_id) === id).map(s => s.shop_id) };
+}
+
 export function validateTelegram(raw, token, now = Date.now()) {
   if (!raw || !token || raw.length > 16000) throw new Error('Telegram orqali qayta kiring.');
   const params = new URLSearchParams(raw);

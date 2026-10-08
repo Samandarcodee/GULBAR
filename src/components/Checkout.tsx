@@ -4,6 +4,8 @@ import { Truck, Minus, Plus, Trash2, ArrowRight, ShieldCheck, CheckCircle2, Hist
 import type { CartItem, Catalog, Customer, Delivery, Order } from '../types';
 import { api, haptic, money, readStored, writeStored } from '../lib/api';
 import { Dialog } from './Dialog';
+import { PhoneField, TextField } from './Field';
+import { phoneMessage } from '../../server/phone.js';
 import { GreetingCard, cardName, styles } from './GreetingCard';
 import { shopStatus, useNow } from '../lib/hours-ui';
 import { addDays, cardTemplates, dayLabel, slotOptions, tashkentDate, validateDelivery, MAX_DAYS } from '../../server/delivery.js';
@@ -12,6 +14,14 @@ import type { Point } from './MapPicker';
 const MapPicker = lazy(() => import('./MapPicker'));
 type Saved = { name: string; phone: string; cardStyle?: string };
 type Place = { recipient: string; recipientPhone: string; address: string; point?: Point };
+// what is wrong with a field, said so the buyer knows how to fix it (empty text means fine)
+function fieldMessage(name: string, value: string): string {
+  if (name === 'phone' || name === 'recipientPhone') return phoneMessage(value);
+  if (name === 'name') return value.trim().length < 2 ? 'Ismingizni yozing, masalan: Dilnoza Karimova.' : '';
+  if (name === 'recipient') return value.trim().length < 2 ? 'Qabul qiluvchining ismini yozing.' : '';
+  if (name === 'address') return value.trim().length < 8 ? 'Manzilni to‘liqroq yozing: ko‘cha, uy raqami va mo‘ljal.' : '';
+  return '';
+}
 type Choice = { when: 'asap' } | { when: 'slot'; date: string; from: string; to: string };
 
 export function Checkout({ cart, catalog, notes = [], dismissNotes, change, onClose, complete }: { cart: CartItem[]; catalog: Catalog; notes?: string[]; dismissNotes?: () => void; change: (id: string, delta: number) => void; onClose: () => void; complete: (order: Order) => void }) {
@@ -61,8 +71,14 @@ export function Checkout({ cart, catalog, notes = [], dismissNotes, change, onCl
   const canCard = !!shop?.acceptsCard;
   const mustCard = canCard && shop?.delivery === 'taxi' && method === 'delivery';
   const pay: 'cash' | 'card' = !canCard ? 'cash' : mustCard ? 'card' : payPref;
-  const update = (name: keyof Customer, value: string | boolean) => { setCustomer(c => ({ ...c, [name]: value })); setFields(f => ({ ...f, [name]: '' })); };
-  const phoneValue = (v: string) => '+' + v.replace(/\D/g, '').slice(0, 12);
+  // the general "check the marked fields" banner has done its job as soon as the buyer starts fixing them
+  const update = (name: keyof Customer, value: string | boolean) => { setCustomer(c => ({ ...c, [name]: value })); setError(e => e === 'Belgilangan maydonlarni tekshiring.' ? '' : e); setFields(f => ({ ...f, [name]: '' })); };
+  // checked when the buyer leaves a field they have started to fill; empty fields are reported on send, not while tabbing past them
+  const check = (name: 'name' | 'phone' | 'recipient' | 'recipientPhone' | 'address') => {
+    const value = customer[name];
+    if (!value.trim() || value === '+998') return;
+    setFields(f => ({ ...f, [name]: fieldMessage(name, value) }));
+  };
   const usePlace = (p: Place) => { haptic(); setSelf(false); setPoint(p.point || null); setCustomer(c => ({ ...c, recipient: p.recipient, recipientPhone: p.recipientPhone, address: p.address })); setFields({}); };
   const pickMethod = (m: 'delivery' | 'pickup') => {
     haptic(); setMethod(m); setFields({});
@@ -81,11 +97,12 @@ export function Checkout({ cart, catalog, notes = [], dismissNotes, change, onCl
     const asSelf = self || pickup;
     const data: Customer = { ...customer, ...(asSelf ? { recipient: customer.name, recipientPhone: customer.phone } : {}), ...(pickup ? { address: shop.address } : {}), cardFrom: customer.anonymous ? '' : (customer.cardFrom || '').trim() || customer.name };
     const errors: Record<string, string> = {};
-    if (!data.name.trim()) errors.name = 'Bu maydonni to‘ldiring.';
-    if (!pickup && !asSelf && !data.recipient.trim()) errors.recipient = 'Bu maydonni to‘ldiring.';
-    if (!pickup && data.address.trim().length < 8) errors.address = 'Ko‘cha, uy raqami va mo‘ljalni kiriting.';
-    for (const name of ['phone', 'recipientPhone'] as const) if (!/^\+998\d{9}$/.test(data[name])) errors[name] = '+998 va 9 ta raqam kiriting.';
-    if (Object.keys(errors).length) { setFields(errors); setError('Belgilangan maydonlarni tekshiring.'); setTimeout(() => errorRef.current?.focus(), 0); return; }
+    const need = (name: 'name' | 'phone' | 'recipient' | 'recipientPhone' | 'address') => { const message = fieldMessage(name, data[name]); if (message) errors[name] = message; };
+    need('name'); need('phone');
+    if (!pickup && !asSelf) { need('recipient'); need('recipientPhone'); }
+    if (!pickup) need('address');
+    // the first field that needs attention gets the cursor, so a long form never leaves the buyer searching for it
+    if (Object.keys(errors).length) { setFields(errors); setError('Belgilangan maydonlarni tekshiring.'); setTimeout(() => document.querySelector<HTMLElement>('#checkout [aria-invalid="true"]')?.focus(), 0); return; }
     if (!choice) { setError('Yetkazish vaqtini tanlang.'); setTimeout(() => errorRef.current?.focus(), 0); return; }
     const delivery: Delivery = { method, ...choice, ...(!pickup && point ? { point } : {}) } as Delivery;
     const checked = validateDelivery(delivery, shop, new Date());
@@ -100,10 +117,6 @@ export function Checkout({ cart, catalog, notes = [], dismissNotes, change, onCl
     } catch (e) { setError((e as Error).message); setTimeout(() => errorRef.current?.focus(), 0); }
     finally { setBusy(false); }
   }
-  const input = (name: 'name' | 'phone' | 'recipient' | 'recipientPhone' | 'address', label: string, placeholder: string) => {
-    const isPhone = name === 'phone' || name === 'recipientPhone';
-    return <label className="field">{label}<input name={name} aria-label={label} value={customer[name]} onChange={e => update(name, isPhone ? phoneValue(e.target.value) : e.target.value)} placeholder={placeholder} maxLength={name === 'address' ? 300 : isPhone ? 13 : 80} autoComplete={isPhone ? 'tel' : name === 'name' ? 'name' : 'off'} inputMode={isPhone ? 'tel' : 'text'} aria-invalid={!!fields[name]} aria-describedby={fields[name] ? `${name}-error` : undefined} /><span className="field-error" id={`${name}-error`}>{fields[name]}</span></label>;
-  };
   const pickup = method === 'pickup';
   return <Dialog title={step === 0 ? 'Sizning savatingiz' : 'Buyurtma ma’lumotlari'} onClose={() => { if (!busy) onClose(); }}>
     {catalog.demo && <p className="demo-note">Demo buyurtma — haqiqiy do‘konga yuborilmaydi.</p>}
@@ -124,14 +137,14 @@ export function Checkout({ cart, catalog, notes = [], dismissNotes, change, onCl
         </fieldset>
 
         <fieldset className="co-section"><legend>{pickup ? 'Olib ketuvchi' : 'Kimdan va kimga'}</legend>
-          <div className="form-grid">{input('name', 'Ismingiz', 'Ism familiya')}{input('phone', 'Telefoningiz', '+998901234567')}</div>
+          <div className="form-grid stack-on-phone"><TextField name="name" label="Ismingiz" value={customer.name} onChange={v => update('name', v)} onBlur={() => check('name')} error={fields.name} placeholder="Dilnoza Karimova…" autoComplete="name" autoCapitalize="words" maxLength={80} enterKeyHint="next" /><PhoneField name="phone" label="Telefoningiz" value={customer.phone} onChange={v => update('phone', v)} onBlur={() => check('phone')} error={fields.phone} /></div>
           {!pickup && <>
             <label className="checkbox self-toggle"><input type="checkbox" checked={self} onChange={e => { setSelf(e.target.checked); setFields({}); }} />Gullar o‘zim uchun</label>
             {!self && <>
               {recent.length > 0 && <div className="recent-places" role="group" aria-label="Oldingi manzillar"><span><History size={14} aria-hidden="true" /> Oldingi manzillar</span>{recent.map(p => <button type="button" key={p.address} className={customer.address === p.address ? 'on' : ''} onClick={() => usePlace(p)}><b>{p.recipient}</b><small>{p.address}</small></button>)}</div>}
-              <div className="form-grid">{input('recipient', 'Qabul qiluvchi', 'Kim uchun?')}{input('recipientPhone', 'Qabul qiluvchi telefoni', '+998901234567')}</div>
+              <div className="form-grid stack-on-phone"><TextField name="recipient" label="Qabul qiluvchi" value={customer.recipient} onChange={v => update('recipient', v)} onBlur={() => check('recipient')} error={fields.recipient} placeholder="Kim uchun? Masalan: Madina opa…" autoCapitalize="words" maxLength={80} enterKeyHint="next" /><PhoneField name="recipientPhone" label="Qabul qiluvchi telefoni" value={customer.recipientPhone} onChange={v => update('recipientPhone', v)} onBlur={() => check('recipientPhone')} error={fields.recipientPhone} /></div>
             </>}
-            {input('address', 'Urganchdagi yetkazish manzili', 'Ko‘cha, uy raqami, mo‘ljal')}
+            <TextField name="address" label="Urganchdagi yetkazish manzili" value={customer.address} onChange={v => update('address', v)} onBlur={() => check('address')} error={fields.address} placeholder="Ko‘cha, uy, xonadon va mo‘ljal. Masalan: Al-Xorazmiy 12, 3-xonadon, Anor do‘koni yonida…" autoComplete="street-address" multiline rows={2} maxLength={300} />
             <div className="map-field">
               {point ? <p className="map-set"><MapPin size={16} aria-hidden="true" /> Xaritada belgilandi<button type="button" className="map-clear" onClick={() => setPoint(null)} aria-label="Xarita nuqtasini olib tashlash"><X size={14} /></button></p> : null}
               <button type="button" className="secondary" onClick={() => setMapOpen(true)}><MapPin size={17} /> {point ? 'Nuqtani o‘zgartirish' : 'Xaritada belgilash'}</button>

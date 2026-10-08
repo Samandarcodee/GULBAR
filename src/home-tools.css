@@ -47,8 +47,6 @@
   .gm-shop-name { max-width: 72px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11.5px; line-height: 1.2; }
   .gm-shop-state { margin-top: -2px; font-size: 10.5px; white-space: nowrap; }
   .gm-tools { margin-top: 8px; }
-  .gm-bar { margin-top: 2px; }
-  .gm-chips { padding: 4px 0; padding-right: 24px; }
   .gm-count { margin: 8px 0 12px; }
   .gm-count h2 { font-size: 22px; }
   .gm-count p { font-size: 13px; }

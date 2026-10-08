@@ -106,6 +106,7 @@ Istalgan vaqtda (yetkazilgunga qadar): `Bekor qilindi`.
 - **Mavjud do'konga login qo'shish** (login yo'q do'konlar uchun) mumkin.
 - **Tayyorlik ko'rsatkichi:** har bir do'kon kartasida 4 qadam (telefon, Telegram, login, gullar) va «Keyingi qadam» yozuvi. Hammasi tayyor bo'lsa «Buyurtma qabul qila oladi».
 - **Filtr va qidiruv:** Hammasi / Tayyor emas / Tayyor.
+- **Panelga kirish havolalari:** «Admin paneli» va «Do'kon paneli» havolalari oddiy xaridorlarga ko'rinmaydi. Ular faqat Telegram ID'si administratorniki (`ADMIN_CHAT_ID`) yoki do'kon egasiniki (do'konning Telegram ID'si) bo'lganlarga chiqadi. To'g'ridan-to'g'ri manzillar (`/admin`, `/merchant`) ishlayveradi, kirish baribir login va parol bilan.
 - **Hisobni boshqarish:** parolni tiklash, loginni bloklash (sessiyalar yopiladi).
 - **Do'konni o'chirish:** do'kon kartasidagi «O'chirish» tugmasi. Tasdiqlash uchun do'kon nomini yozish kerak. Do'kon, gullari, rasmlari, sharhlari va egasining logini o'chadi, egasi tizimdan chiqib ketadi. Oldingi buyurtmalar xaridorlarda tarix sifatida qoladi. Tugallanmagan buyurtma (kutilmoqda, qabul qilindi, yo'lda) bo'lsa o'chirish rad etiladi. Qaytarib bo'lmaydi; vaqtincha yopish uchun «Do'konni katalogda ochish» belgisini olib tashlang.
 

@@ -1,0 +1,44 @@
+/* Forms: roomier fields (16px, no iOS zoom), a clear focus ring, problems written under the field, one phone field. */
+.field { gap: 8px; font-size: 13px; font-weight: 600; color: var(--text); }
+.field-label { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.field-label label { font-size: 13px; font-weight: 600; }
+.field-label .optional { font-size: 12px; font-weight: 400; color: var(--muted); }
+.field-hint { margin: 0; font-size: 12.5px; font-weight: 400; line-height: 1.5; color: var(--muted); }
+.field-count { align-self: flex-end; margin-top: -4px; font-size: 12px; font-weight: 400; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+.field input:not([type=checkbox]):not([type=radio]), .field select, .field textarea {
+  min-height: 52px; padding: 0 14px; border: 1.5px solid var(--line); border-radius: 12px; background: var(--surface); color: var(--text);
+  font: inherit; font-size: 16px; font-weight: 400; transition: border-color .15s, box-shadow .15s, background-color .15s;
+}
+.field textarea { padding: 14px; min-height: 88px; line-height: 1.5; resize: vertical; field-sizing: content; }
+.field input::placeholder, .field textarea::placeholder { color: var(--muted); opacity: .9; font-weight: 400; }
+@media (hover: hover) {
+  .field input:not([type=checkbox]):not([type=radio]):not(:focus):not([aria-invalid=true]):hover, .field select:not(:focus):hover, .field textarea:not(:focus):not([aria-invalid=true]):hover { border-color: color-mix(in srgb, var(--text) 40%, var(--line)); }
+}
+.field input:not([type=checkbox]):not([type=radio]):focus, .field select:focus, .field textarea:focus {
+  outline: 0; border-color: var(--text); box-shadow: 0 0 0 4px color-mix(in srgb, var(--text) 11%, transparent);
+}
+.field [aria-invalid=true] { border-color: #a42639; background: color-mix(in srgb, #a42639 5%, var(--surface)); }
+.field [aria-invalid=true]:focus { box-shadow: 0 0 0 4px color-mix(in srgb, #a42639 18%, transparent); }
+:root[data-theme=dark] .field [aria-invalid=true] { border-color: #ff8f9c; }
+
+.field-error { display: flex; align-items: flex-start; gap: 6px; margin: 0; font-size: 13px; font-weight: 400; line-height: 1.45; color: #a42639; }
+.field-error svg { flex-shrink: 0; margin-top: 2px; }
+:root[data-theme=dark] .field-error { color: #ffb2bb; }
+
+/* phone: a fixed "+998" in front, the digits grouped as people read them */
+.field .phone-input { display: flex; align-items: center; min-height: 52px; border: 1.5px solid var(--line); border-radius: 12px; background: var(--surface); transition: border-color .15s, box-shadow .15s; }
+.field .phone-input:focus-within { border-color: var(--text); box-shadow: 0 0 0 4px color-mix(in srgb, var(--text) 11%, transparent); }
+.field .phone-input[data-invalid=true] { border-color: #a42639; background: color-mix(in srgb, #a42639 5%, var(--surface)); }
+.field .phone-input[data-invalid=true]:focus-within { box-shadow: 0 0 0 4px color-mix(in srgb, #a42639 18%, transparent); }
+:root[data-theme=dark] .field .phone-input[data-invalid=true] { border-color: #ff8f9c; }
+.phone-prefix { align-self: stretch; display: flex; align-items: center; padding: 0 12px 0 14px; border-right: 1px solid var(--line); font-size: 16px; font-weight: 600; color: var(--muted); font-variant-numeric: tabular-nums; }
+.field .phone-input > input[type=tel], .field .phone-input > input[type=tel]:focus, .field .phone-input > input[type=tel][aria-invalid=true] {
+  flex: 1; min-width: 0; border: 0; border-radius: 0 12px 12px 0; background: transparent; box-shadow: none; font-variant-numeric: tabular-nums; letter-spacing: .03em;
+}
+.phone-ok { flex-shrink: 0; margin-right: 12px; color: #1f7a3a; }
+:root[data-theme=dark] .phone-ok { color: #9fd8a8; }
+@media (prefers-reduced-motion: reduce) { .field input, .field textarea, .field select, .field .phone-input { transition: none; } }
+
+/* on a phone the name and the phone number each get a full row: a number needs about 11 characters of width */
+@media (max-width: 520px) { .form-grid.stack-on-phone { grid-template-columns: 1fr; } }

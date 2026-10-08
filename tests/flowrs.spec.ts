@@ -5,10 +5,7 @@ test('default minimal grid: filters, shop select, add and favourite', async ({ p
   await page.goto('/');
   await expect(page.getByRole('heading', { level: 1, name: 'Urganch guldastalari' })).toBeVisible();
   await expect(page.locator('.gm-item')).toHaveCount(29);
-  await page.getByRole('button', { name: 'Onamga', exact: true }).click();
-  await expect(page.locator('.gm-item')).toHaveCount(15);
-  await page.getByRole('button', { name: 'Hammasi', exact: true }).click();
-  await expect(page.locator('.gm-item')).toHaveCount(29);
+  await expect(page.getByRole('group', { name: 'Gul kimga?' })).toHaveCount(0);
   await page.locator('.gm-shops').getByRole('button', { name: 'Rayhon', exact: true }).click();
   await expect(page.locator('.gm-item')).toHaveCount(2);
   await expect(page.getByRole('heading', { name: 'Rayhon', exact: true })).toBeVisible();

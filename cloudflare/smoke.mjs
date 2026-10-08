@@ -23,6 +23,11 @@ async function call(path, method = 'GET', body, who = user, bearer) {
 
 const day = new Date(Date.now() + 5 * 3600000 + 2 * 86400000).toISOString().slice(0, 10);
 const catalog = (await call('/catalog')).data;
+// which panel links this visitor may see: in demo mode everything, so the demo and the tests work
+const me = await call('/me');
+assert.equal(me.status, 200);
+assert.equal(me.data.admin, true);
+assert.ok(Array.isArray(me.data.shops) && me.data.shops.length > 0);
 assert.equal(catalog.demo, true, 'run the Worker with --var DEMO_MODE:true');
 const product = catalog.products.find(p => p.shopId === 'lola' && p.stock > 3);
 assert.ok(product, 'the demo seed needs a Lola Flowers product with stock');

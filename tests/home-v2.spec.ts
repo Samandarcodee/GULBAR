@@ -48,29 +48,28 @@ test('search, sort and budget narrow the list; the filters survive a trip to a s
   expect(nums).toEqual([...nums].sort((a, b) => a - b));
   const narrowed = await items.count();
 
-  // choose "Onamga", scroll, open a shop and come back
-  await page.getByRole('button', { name: 'Onamga', exact: true }).click();
-  const withWho = await items.count();
+  // choose a shop, sort, scroll, open the shop page and come back
   await page.getByRole('button', { name: 'Tozalash' }).first().click();
-  await page.getByRole('button', { name: 'Onamga', exact: true }).click();
+  await page.locator('.gm-shops').getByRole('button', { name: 'Gold Flowers', exact: true }).click();
   await page.getByRole('button', { name: 'Saralash va narx' }).click();
   await page.getByRole('radio', { name: 'Avval qimmatlari' }).click();
   await page.getByRole('button', { name: /ta guldastani ko‘rish/ }).click();
-  await page.evaluate(() => window.scrollTo(0, 700));
-  await page.waitForTimeout(300);
+  // bring the link into view first (Playwright would otherwise scroll by itself) and measure the position the buyer really leaves from
+  const link = page.locator('.gm-shop-link:visible').last();
+  await link.scrollIntoViewIfNeeded();
+  await page.waitForTimeout(400);
   const before = await page.evaluate(() => window.scrollY);
-  expect(before).toBeGreaterThan(500);
-  await page.locator('.gm-shop-link:visible').first().click();
+  expect(before).toBeGreaterThan(300);
+  await link.click();
   await expect(page.getByRole('button', { name: 'Orqaga' })).toBeVisible();
   expect(await page.evaluate(() => window.scrollY)).toBeLessThan(50);
   await page.getByRole('button', { name: 'Orqaga' }).click();
-  await expect(page.getByRole('button', { name: 'Onamga', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('.gm-shops').getByRole('button', { name: 'Gold Flowers', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(before - 40);
   expect(await page.evaluate(() => window.scrollY)).toBeLessThan(before + 40);
   await page.getByRole('button', { name: 'Saralash va narx (tanlangan)' }).click();
   await expect(page.getByRole('radio', { name: 'Avval qimmatlari' })).toHaveAttribute('aria-checked', 'true');
   expect(narrowed).toBeGreaterThan(0);
-  expect(withWho).toBeGreaterThan(0);
 });
 
 test('a saved cart with a vanished product is cleaned up and explained, and the order still goes through', async ({ page }) => {
