@@ -103,7 +103,7 @@ test('Telegram signature validates genuine data, rejects tampering and expired a
   const raw = sign(Math.floor(now / 1000));
   assert.equal(validateTelegram(raw, token, now).id, 'tg:12345');
   assert.throws(() => validateTelegram(raw.replace('test-query', 'forged-query'), token, now));
-  assert.throws(() => validateTelegram(sign(Math.floor(now / 1000) - 7200), token, now));
+  assert.throws(() => validateTelegram(sign(Math.floor(now / 1000) - 2 * 24 * 3600), token, now));
   assert.throws(() => validateTelegram(`${raw}&user=123`, token, now));
 });
 

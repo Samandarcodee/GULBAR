@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type MutableRefObject } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useLayoutEffect, useRef, useState, type MutableRefObject } from 'react';
 import { AnimatePresence, motion, MotionConfig, useReducedMotion } from 'motion/react';
 import { Flower2, MapPin, ChevronDown, ArrowUpRight, ArrowRight, Search, SlidersHorizontal, Heart, ShoppingBag, Store, Package, X, Truck, Clock3, CheckCircle2, ShieldCheck, UserRound } from 'lucide-react';
 import type { CartItem, Catalog, Order, Product } from './types';
@@ -6,11 +6,13 @@ import { api, money, readStored, writeStored, haptic, statusNames } from './lib/
 import { ProductCard } from './components/ProductCard';
 import { Dialog } from './components/Dialog';
 import { Checkout } from './components/Checkout';
-import { Merchant } from './components/Merchant';
-import { Admin } from './components/Admin';
-import { Home } from './components/Home';
-import { HomeFeed } from './components/HomeFeed';
-import { HomeWheel } from './components/HomeWheel';
+// panels and the older home drafts are only needed by a few visitors, so they load on demand
+const Merchant = lazy(() => import('./components/Merchant').then(m => ({ default: m.Merchant })));
+const Admin = lazy(() => import('./components/Admin').then(m => ({ default: m.Admin })));
+const Home = lazy(() => import('./components/Home').then(m => ({ default: m.Home })));
+const HomeFeed = lazy(() => import('./components/HomeFeed').then(m => ({ default: m.HomeFeed })));
+const HomeWheel = lazy(() => import('./components/HomeWheel').then(m => ({ default: m.HomeWheel })));
+const fallback = <main className="page-content loading-page"><div className="skeleton hero-skeleton" /><p role="status">Yuklanmoqda…</p></main>;
 import { HomeMinimal, noFilters, readFilters, type HomeFilters } from './components/HomeMinimal';
 import { CancelReason } from './components/CancelReason';
 import { ProductSheet } from './components/ProductSheet';
@@ -175,9 +177,9 @@ export default function App() {
 
   const homeProps = { catalog: catalog!, favorites, cart, shopFilter, setShopFilter, filters: homeFilters, setFilters: setHomeFilters, open: setSelected, add: (p: Product) => add(p), toggleFavorite: favorite, openShops: () => navigate('shops'), openShop };
   const HOME_MINIMAL = catalog && <HomeMinimal {...homeProps} />;
-  const HOME_WHEEL = catalog && <HomeWheel {...homeProps} />;
-  const HOME_FEED = catalog && <HomeFeed {...homeProps} />;
-  const HOME_PICKER = catalog && <Home {...homeProps} />;
+  const HOME_WHEEL = catalog && <Suspense fallback={fallback}><HomeWheel {...homeProps} /></Suspense>;
+  const HOME_FEED = catalog && <Suspense fallback={fallback}><HomeFeed {...homeProps} /></Suspense>;
+  const HOME_PICKER = catalog && <Suspense fallback={fallback}><Home {...homeProps} /></Suspense>;
 
   return <MotionConfig reducedMotion="user"><div className={`app-shell${page === 'home' ? ` home-view home-${homeVariant === 'picker' ? 'picker' : homeVariant}` : (page === 'admin' || page === 'merchant') ? ' home-view home-minimal panel-view' : page === 'shop' ? ' home-view home-minimal' : ''}`}>
     <header className="site-header"><div className="header-inner"><button className="brand" onClick={() => navigate('home')} aria-label="GulBar bosh sahifa"><Flower2 className="brand-flower" size={32} strokeWidth={1.7} /><span>GulBar<span className="brand-dot">.</span></span></button>
@@ -187,7 +189,7 @@ export default function App() {
     </div></header>
     <AnimatePresence mode="wait" initial={false}><motion.div key={catalog ? page : "loading"} className="page-fade" initial={reduceMotion ? false : { opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: .24, ease: [0.22, 1, 0.36, 1] }}>
     <ScrollRestore target={restore} />
-    {!catalog ? <main className="page-content loading-page">{loadError ? <div className="empty"><Flower2 size={40} /><h1>Katalogni ochib bo‘lmadi</h1><p role="alert">{loadError}</p><button className="primary" onClick={load}>Qayta urinish</button></div> : <><div className="skeleton hero-skeleton" /><div className="product-grid">{[1, 2, 3, 4].map(n => <div key={n} className="skeleton card-skeleton" />)}</div><p role="status">Gullar yuklanmoqda…</p></>}</main> : page === 'admin' ? <Admin demo={catalog.demo} back={() => navigate('home', true)} reload={load} /> : page === 'merchant' ? <Merchant catalog={catalog} back={() => navigate('home', true)} reload={load} /> : page === 'shop' && catalog.shops.some(x => x.id === shopId) ? <ShopPage shop={catalog.shops.find(x => x.id === shopId)!} catalog={catalog} favorites={favorites} cart={cart} back={() => navigate('home', true)} open={setSelected} add={p => add(p)} toggleFavorite={favorite} /> : <main className="page-content">
+    {!catalog ? <main className="page-content loading-page">{loadError ? <div className="empty"><Flower2 size={40} /><h1>Katalogni ochib bo‘lmadi</h1><p role="alert">{loadError}</p><button className="primary" onClick={load}>Qayta urinish</button></div> : <><div className="skeleton hero-skeleton" /><div className="product-grid">{[1, 2, 3, 4].map(n => <div key={n} className="skeleton card-skeleton" />)}</div><p role="status">Gullar yuklanmoqda…</p></>}</main> : page === 'admin' ? <Suspense fallback={fallback}><Admin demo={catalog.demo} back={() => navigate('home', true)} reload={load} /></Suspense> : page === 'merchant' ? <Suspense fallback={fallback}><Merchant catalog={catalog} back={() => navigate('home', true)} reload={load} /></Suspense> : page === 'shop' && catalog.shops.some(x => x.id === shopId) ? <ShopPage shop={catalog.shops.find(x => x.id === shopId)!} catalog={catalog} favorites={favorites} cart={cart} back={() => navigate('home', true)} open={setSelected} add={p => add(p)} toggleFavorite={favorite} /> : <main className="page-content">
       {catalog.demo && <div className="demo-bar"><span className="demo-dot" /> Demo ko‘rinish <span className="demo-extra">· do‘konlar va narxlar namunaviy</span><button onClick={() => setInfo(true)}>Batafsil <ArrowUpRight size={13} /></button></div>}
       {page === 'home' && (homeVariant === 'feed' ? HOME_FEED : homeVariant === 'picker' ? HOME_PICKER : homeVariant === 'wheel' ? HOME_WHEEL : HOME_MINIMAL)}
 

@@ -6,6 +6,8 @@ export function secureEqual(a, b) {
   return x.length === y.length && timingSafeEqual(x, y);
 }
 
+// Telegram only signs the launch time once; a Mini App that stays open for hours must keep working, so the window is a day.
+export const MAX_AGE_SECONDS = 24 * 3600;
 export function validateTelegram(raw, token, now = Date.now()) {
   if (!raw || !token || raw.length > 16000) throw new Error('Telegram orqali qayta kiring.');
   const params = new URLSearchParams(raw);
@@ -19,7 +21,7 @@ export function validateTelegram(raw, token, now = Date.now()) {
   if (!secureEqual(hash, expected)) throw new Error('Telegram tasdig‘i noto‘g‘ri.');
   const date = Number(params.get('auth_date'));
   const age = Math.floor(now / 1000) - date;
-  if (!Number.isInteger(date) || age < -30 || age > 3600) throw new Error('Sessiya tugadi. Mini App’ni qayta oching.');
+  if (!Number.isInteger(date) || age < -30 || age > MAX_AGE_SECONDS) throw new Error('Sessiya tugadi. Mini App’ni qayta oching.');
   let user;
   try { user = JSON.parse(params.get('user') || 'null'); } catch { throw new Error('Telegram foydalanuvchisi topilmadi.'); }
   if (!Number.isSafeInteger(user?.id) || user.id <= 0) throw new Error('Telegram foydalanuvchisi topilmadi.');

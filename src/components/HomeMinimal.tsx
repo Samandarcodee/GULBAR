@@ -3,7 +3,7 @@ import { AnimatePresence, MotionConfig, motion, useReducedMotion } from 'motion/
 import { Check, Flower2, Heart, Plus, Search, SlidersHorizontal, X } from 'lucide-react';
 import type { CartItem, Catalog, Product, Shop } from '../types';
 import { haptic, money } from '../lib/api';
-import { sampleTint, type Tint } from './HomeFeed';
+import { sampleTint, type Tint } from '../lib/tint';
 import { useFly } from './Fly';
 import { RatingLine } from './Reviews';
 import { shopStatus, useNow } from '../lib/hours-ui';

@@ -1,73 +1,92 @@
+// Smoke test for the real Worker (Hono + D1) in demo mode. The Playwright and unit suites run the Node demo server,
+// so this is the check that the production code path answers correctly.
+//
+//   1. one-off setup:  npx wrangler d1 migrations apply gulbar-live --local --persist-to .wrangler/smoke
+//                      npx wrangler d1 execute gulbar-live --local --persist-to .wrangler/smoke --file=cloudflare/seed-demo.sql
+//   2. start Worker:   npx wrangler dev --local --port 8799 --persist-to .wrangler/smoke --var DEMO_MODE:true
+//   3. run:            npm run cf:smoke            (DEMO_MERCHANT_TOKEN is read from .dev.vars or the environment)
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
-const url = process.argv[2] || 'http://127.0.0.1:8787';
-const token = JSON.parse(readFileSync(new URL('../.cloudflare-secrets.json', import.meta.url), 'utf8')).DEMO_MERCHANT_TOKEN;
+
+const url = process.argv[2] || 'http://127.0.0.1:8799';
+function merchantToken() {
+  if (process.env.DEMO_MERCHANT_TOKEN) return process.env.DEMO_MERCHANT_TOKEN;
+  try { return (readFileSync(new URL('../.dev.vars', import.meta.url), 'utf8').match(/^DEMO_MERCHANT_TOKEN=(.*)$/m) || [])[1]?.replace(/^"|"$/g, '') || ''; } catch { return ''; }
+}
+const token = merchantToken();
 const user = randomUUID();
-async function call(path, method = 'GET', body, secret, customer = user) {
-  const response = await fetch(`${url}/api${path}`, { method,
-    headers: { 'Content-Type': 'application/json', 'X-Demo-User': customer, ...(secret ? { Authorization: `Bearer ${secret}` } : {}) },
-    ...(body ? { body: JSON.stringify(body) } : {}),
-  });
-  const data = await response.json();
-  return { status: response.status, data };
+async function call(path, method = 'GET', body, who = user, bearer) {
+  const r = await fetch(`${url}/api${path}`, { method, headers: { 'Content-Type': 'application/json', 'X-Demo-User': who, ...(bearer ? { Authorization: `Bearer ${bearer}` } : {}) }, ...(body ? { body: JSON.stringify(body) } : {}) });
+  return { status: r.status, data: await r.json().catch(() => null) };
 }
-assert.equal((await call('/health')).data.ok, true);
+
+const day = new Date(Date.now() + 5 * 3600000 + 2 * 86400000).toISOString().slice(0, 10);
 const catalog = (await call('/catalog')).data;
-assert.equal(catalog.demo, true);
-assert.equal(catalog.merchantProtected, true);
-assert.equal(catalog.shops.length, 3);
+assert.equal(catalog.demo, true, 'run the Worker with --var DEMO_MODE:true');
+const product = catalog.products.find(p => p.shopId === 'lola' && p.stock > 3);
+assert.ok(product, 'the demo seed needs a Lola Flowers product with stock');
+const stockOf = async () => (await call('/catalog')).data.products.find(p => p.id === product.id).stock;
+const before = await stockOf();
+const customer = (extra = {}) => ({ name: 'Test Xaridor', phone: '+998901234567', recipient: 'Qabul Qiluvchi', recipientPhone: '+998901234568', address: 'Urganch, test ko‘chasi 12', deliveryTime: 'tomorrow', anonymous: false, note: 'Tug‘ilgan kun muborak', cardStyle: 'gold', cardFrom: 'Test', ...extra });
+const order = (delivery, who = user) => call('/orders', 'POST', { requestKey: randomUUID(), shopId: 'lola', items: [{ productId: product.id, quantity: 1 }], customer: customer(), ...(delivery ? { delivery } : {}) }, who);
+
+// delivery with a window and a map point; the fee is the shop's
+const a = await order({ method: 'delivery', when: 'slot', date: day, from: '10:00', to: '12:00', point: { lat: 41.55, lng: 60.63 } });
+assert.equal(a.status, 201, JSON.stringify(a.data));
+assert.equal(a.data.deliveryFee, 20000);
+assert.deepEqual(a.data.delivery.point, { lat: 41.55, lng: 60.63 });
+assert.equal(await stockOf(), before - 1);
+
+// pickup: no fee, no point
+const b = await order({ method: 'pickup', when: 'slot', date: day, from: '14:00', to: '16:00', point: { lat: 41.55, lng: 60.63 } });
+assert.equal(b.status, 201, JSON.stringify(b.data));
+assert.equal(b.data.deliveryFee, 0);
+assert.equal(b.data.delivery.point, undefined);
+assert.equal(b.data.total, product.price);
+
+// bad windows and points are refused
+assert.equal((await order({ method: 'delivery', when: 'slot', date: day, from: '10:00', to: '10:20' })).status, 409);
+assert.equal((await order({ method: 'delivery', when: 'slot', date: day, from: '10:00', to: '12:00', point: { lat: 10, lng: 10 } })).status, 400);
+
+// the buyer lists own orders; the shop lists its orders (this route once returned 500)
+const mine = await call('/orders');
+assert.equal(mine.status, 200);
+assert.ok(mine.data.some(o => o.id === a.data.id) && mine.data.every(o => 'reviewed' in o));
+if (token) {
+  const shopOrders = await call('/merchant/lola/orders', 'GET', undefined, user, token);
+  assert.equal(shopOrders.status, 200, 'shop order list must answer 200: ' + JSON.stringify(shopOrders.data));
+  assert.ok(shopOrders.data.some(o => o.id === a.data.id));
+} else console.log('skipped: shop order list (no DEMO_MERCHANT_TOKEN)');
 assert.equal((await call('/merchant/lola/orders')).status, 401);
-assert.equal((await call('/merchant/lola/orders', 'GET', undefined, 'incorrect-key')).status, 401);
-assert.equal((await call('/merchant/lola/workspace')).status, 401);
-assert.equal((await call('/merchant/lola/settings', 'PATCH', {})).status, 401);
-const workspace = await call('/merchant/lola/workspace', 'GET', undefined, token);
-assert.equal(workspace.status, 200);
-assert.equal(workspace.data.shop.id, 'lola');
-assert.ok(workspace.data.products.every(p => p.shopId === 'lola'));
-assert.equal((await call('/admin/shops', 'POST', {})).status, 401);
-assert.equal((await fetch(`${url}/merchant`)).status, 200);
-assert.equal((await fetch(`${url}/api/no-such-route`)).status, 404);
-assert.equal((await fetch(`${url}/images/pink-bouquet.jpg`)).status, 200);
-if (process.argv.includes('--read-only')) { console.log('Cloudflare read-only health, catalog, assets, routing and auth checks passed.'); process.exit(0); }
-const before = catalog.products.find(p => p.id === 'p1');
-const customer = { name: 'Demo smoke test', phone: '+998900000000', recipient: 'Demo test', recipientPhone: '+998900000000', address: 'Urganch, demo test manzili', deliveryTime: 'soon', note: 'Automated demo test, no delivery', anonymous: false };
-const input = { requestKey: randomUUID(), shopId: 'lola', items: [{ productId: 'p1', quantity: 1 }], customer, total: 1 };
-const [first, retry] = await Promise.all([call('/orders', 'POST', input), call('/orders', 'POST', input)]);
-assert.ok([200, 201].includes(first.status), `Order failed: ${first.status}`);
-assert.equal(first.data.id, retry.data.id);
-assert.equal(first.data.total, before.price + catalog.shops[0].deliveryFee);
-assert.equal(first.data.notification, 'demo');
-const after = (await call('/catalog')).data.products.find(p => p.id === 'p1');
-assert.equal(after.stock, before.stock - 1);
-assert.equal((await call('/orders')).data.length, 1);
-assert.equal((await call('/orders', 'GET', undefined, undefined, randomUUID())).data.length, 0);
-const mixed = await call('/orders', 'POST', { ...input, requestKey: randomUUID(), items: [{ productId: 'p1', quantity: 1 }, { productId: 'p2', quantity: 1 }] });
-assert.equal(mixed.status, 400);
-assert.equal((await call(`/merchant/bloom/orders/${first.data.id}`, 'PATCH', { status: 'accepted' }, token)).status, 404);
-assert.equal((await call(`/merchant/lola/orders/${first.data.id}`, 'PATCH', { status: 'delivered' }, token)).status, 409);
-assert.equal((await call(`/merchant/lola/orders/${first.data.id}`, 'PATCH', { status: 'accepted' }, token)).data.status, 'accepted');
-assert.equal((await call(`/merchant/lola/orders/${first.data.id}`, 'PATCH', { status: 'cancelled' }, token)).data.status, 'cancelled');
-await call(`/merchant/lola/orders/${first.data.id}`, 'PATCH', { status: 'cancelled' }, token);
-assert.equal((await call('/catalog')).data.products.find(p => p.id === 'p1').stock, before.stock);
-if (process.argv.includes('--merchant')) {
-  const original = workspace.data.shop;
-  try {
-    assert.equal((await call('/merchant/lola/products/p1', 'PATCH', { expectedStock: before.stock + 1, stock: 500 }, token)).status, 409);
-    assert.equal((await call('/merchant/lola/products/p1', 'PATCH', { active: false }, token)).status, 200);
-    assert.ok(!(await call('/catalog')).data.products.some(p => p.id === 'p1'));
-    assert.equal((await call('/merchant/lola/workspace', 'GET', undefined, token)).data.products.find(p => p.id === 'p1').active, false);
-    assert.equal((await call('/orders', 'POST', { ...input, requestKey: randomUUID() })).status, 409);
-    assert.equal((await call('/merchant/lola/settings', 'PATCH', { ...original, active: false, id: 'hijacked' }, token)).data.id, 'lola');
-    assert.ok(!(await call('/catalog')).data.shops.some(s => s.id === 'lola'));
-    assert.equal((await call('/merchant/lola/workspace', 'GET', undefined, token)).data.shop.active, false);
-    assert.equal((await call('/orders', 'POST', { ...input, requestKey: randomUUID() })).status, 400);
-    assert.equal((await call('/merchant/lola/settings', 'PATCH', { ...original, deliveryFee: -1 }, token)).status, 400);
-  } finally {
-    const restoredProduct = await call('/merchant/lola/products/p1', 'PATCH', { active: before.active !== false }, token);
-    const restoredShop = await call('/merchant/lola/settings', 'PATCH', original, token);
-    assert.equal(restoredProduct.status, 200); assert.equal(restoredShop.status, 200);
-  }
-  console.log('Merchant checks passed: hidden products, closed-shop login, settings validation and stale stock rejection. Test changes restored.');
+
+// buyer cancel: stranger gets 404, restock happens once, repeat is harmless, reason is recorded
+assert.equal((await call(`/orders/${a.data.id}/cancel`, 'POST', undefined, randomUUID())).status, 404);
+const cancelled = await call(`/orders/${a.data.id}/cancel`, 'POST');
+assert.equal(cancelled.status, 200, JSON.stringify(cancelled.data));
+assert.equal(cancelled.data.status, 'cancelled');
+assert.equal(cancelled.data.cancelReason, 'customer');
+assert.equal(await stockOf(), before - 1 - 0, 'only the pickup order still holds stock');
+assert.equal((await call(`/orders/${a.data.id}/cancel`, 'POST')).status, 200);
+assert.equal(await stockOf(), before - 1, 'a second cancel must not restock again');
+
+// a shop-side cancel records its own reason
+if (token) {
+  const byShop = await call(`/merchant/lola/orders/${b.data.id}`, 'PATCH', { status: 'cancelled' }, user, token);
+  assert.equal(byShop.status, 200, JSON.stringify(byShop.data));
+  assert.equal(byShop.data.cancelReason, 'shop');
+  assert.equal(await stockOf(), before, 'the shop cancel gives the flowers back too');
 }
-console.log('Cloudflare D1 checks passed: auth, isolation, stock, totals, concurrent idempotency, status transitions, single-shop rule and cancellation restock.');
+
+// support: validation, ownership, privacy, daily limit, closed admin routes
+assert.equal((await call('/support', 'POST', { kind: 'complaint', message: 'ab' })).status, 400);
+const note = await call('/support', 'POST', { kind: 'complaint', message: 'Buyurtma kech yetib keldi', orderId: b.data.id });
+assert.equal(note.status, 201, JSON.stringify(note.data));
+assert.equal((await call('/support', 'POST', { kind: 'question', message: 'Boshqa odamning buyurtmasi', orderId: b.data.id }, randomUUID())).status, 404);
+assert.equal((await call('/support')).data.length, 1);
+assert.equal((await call('/support', 'GET', undefined, randomUUID())).data.length, 0, 'tickets are private');
+for (let i = 0; i < 6; i++) await call('/support', 'POST', { kind: 'question', message: `Savol raqami ${i}` });
+assert.equal((await call('/support', 'POST', { kind: 'question', message: 'Yana bitta savol' })).status, 429);
+assert.equal((await call('/admin/support')).status, 401);
+
+console.log('worker smoke OK');

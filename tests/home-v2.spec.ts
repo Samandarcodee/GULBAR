@@ -108,3 +108,14 @@ test('a cancelled order explains why and what to do next', async ({ page }) => {
   await expect(card.locator('.cancel-reason.customer')).toContainText('Siz bu buyurtmani bekor qildingiz');
   await expect(card.getByRole('button', { name: 'Boshqa do‘kon tanlash' })).toHaveCount(0);
 });
+
+test('a dropped connection ends in a clear message and a retry that works', async ({ page }) => {
+  await page.setViewportSize(phone);
+  let fail = true;
+  await page.route('**/api/catalog', route => (fail ? route.abort() : route.continue()));
+  await page.goto('/');
+  await expect(page.getByRole('alert')).toContainText('Internet sekin yoki uzilgan');
+  fail = false;
+  await page.getByRole('button', { name: 'Qayta urinish' }).click();
+  await expect(page.locator('.gm-item').first()).toBeVisible();
+});

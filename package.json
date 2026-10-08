@@ -18,7 +18,8 @@
     "cf:types": "wrangler types",
     "cf:check": "tsc -p tsconfig.worker.json",
     "cf:deploy": "npm run build && npm run cf:check && wrangler deploy",
-    "cf:test": "node cloudflare/verify-live.mjs"
+    "cf:test": "node cloudflare/verify-live.mjs",
+    "cf:smoke": "node cloudflare/smoke.mjs"
   },
   "dependencies": {
     "dotenv": "^18.0.5",

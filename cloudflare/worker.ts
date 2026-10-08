@@ -222,53 +222,7 @@ app.patch('/api/merchant/:shopId/settings', async c => {
 });
 app.get('/api/merchant/:shopId/orders', async c => {
   const result = await c.env.DB.prepare("SELECT data FROM orders WHERE json_extract(data,'$.shopId')=? ORDER BY created_at DESC LIMIT 100").bind(c.req.param('shopId')).all<Row>();
-  const reviewed = new Set((await c.env.DB.prepare('SELECT order_id FROM reviews WHERE customer_id=?').bind(c.get('customerId')).all<{ order_id: string }>()).results.map(r => r.order_id));
-  return c.json(result.results.map(r => { const o = decode<Order>(r)!; return { ...o, reviewed: reviewed.has(o.id) }; }));
-});
-app.post('/api/orders/:id/cancel', async c => {
-  const id = c.req.param('id'), cid = c.get('customerId');
-  const order = decode<Order>(await c.env.DB.prepare('SELECT data FROM orders WHERE id=? AND customer_id=?').bind(id, cid).first<Row>());
-  if (!order) return c.json({ error: 'Buyurtma topilmadi.' }, 404);
-  if (order.status === 'cancelled') return c.json(order);
-  const refuse = async () => {
-    const phone = (await c.env.DB.prepare('SELECT phone FROM shop_private WHERE shop_id=?').bind(order.shopId).first<{ phone: string }>())?.phone || '';
-    return c.json({ error: 'Do‘kon buyurtmani allaqachon qabul qilgan, endi uni bu yerdan bekor qilib bo‘lmaydi.' + (phone ? ` Do‘kon bilan bog‘laning: ${phone}` : '') }, 409);
-  };
-  if (order.status !== 'pending') return refuse();
-  // Only a still-pending order can be cancelled by the buyer; the SQL trigger gives the flowers back exactly once.
-  const done = await c.env.DB.prepare("UPDATE orders SET data=json_set(data,'$.status','cancelled','$.updatedAt',?,'$.cancelledBy','customer','$.cancelReason','customer') WHERE id=? AND customer_id=? AND json_extract(data,'$.status')='pending'").bind(new Date().toISOString(), id, cid).run();
-  if (!done.meta.changes) { const again = await orderById(c.env, id); return again?.status === 'cancelled' ? c.json(again) : refuse(); }
-  await c.env.DB.prepare('UPDATE outbox SET sent_at=COALESCE(sent_at,?) WHERE order_id=?').bind(new Date().toISOString(), id).run();
-  if (!demo(c.env) && c.env.TELEGRAM_BOT_TOKEN) c.executionCtx.waitUntil((async () => {
-    const chat = await shopChatId(c.env, order.shopId);
-    if (chat) await telegram(c.env, 'sendMessage', { chat_id: chat, text: `Xaridor buyurtmani bekor qildi: #${id.slice(0, 8)}. Gullar qoldiqqa qaytarildi.` }).catch(() => {});
-  })());
-  return c.json(await orderById(c.env, id));
-});
-app.post('/api/support', async c => {
-  const body = supportSchema.safeParse(await c.req.json());
-  if (!body.success) return c.json({ error: body.error.issues[0].message }, 400);
-  const result = await createTicket(accountStore(c.env.DB, true), c.get('customerId'), body.data);
-  if (result.ticket && c.env.ADMIN_CHAT_ID && c.env.TELEGRAM_BOT_TOKEN) c.executionCtx.waitUntil(telegram(c.env, 'sendMessage', { chat_id: c.env.ADMIN_CHAT_ID, text: ticketAdminText(result.ticket) }).catch(() => {}));
-  return c.json(result.data, result.status as 201);
-});
-app.get('/api/support', async c => c.json((await listMine(accountStore(c.env.DB, true), c.get('customerId'))).data));
-app.post('/api/orders/:id/review', async c => {
-  const body = reviewSchema.safeParse(await c.req.json());
-  if (!body.success) return c.json({ error: body.error.issues[0].message }, 400);
-  const row = await c.env.DB.prepare('SELECT data FROM orders WHERE id=? AND customer_id=?').bind(c.req.param('id'), c.get('customerId')).first<Row>();
-  const order = decode<Order>(row);
-  if (!order) return c.json({ error: 'Buyurtma topilmadi.' }, 404);
-  if (order.status !== 'delivered') return c.json({ error: 'Sharh faqat yetkazilgan buyurtmaga qoldiriladi.' }, 409);
-  try { await c.env.DB.prepare(INSERT_REVIEW_SQL).bind(crypto.randomUUID(), order.id, order.shopId, c.get('customerId'), reviewerName(order.customer?.name), body.data.rating, body.data.comment, new Date().toISOString()).run(); }
-  catch { return c.json({ error: 'Bu buyurtmaga sharh allaqachon qoldirilgan.' }, 409); }
-  return c.json({ ok: true }, 201);
-});
-app.get('/api/shops/:id/reviews', async c => {
-  const id = c.req.param('id');
-  const stats = await c.env.DB.prepare(SHOP_RATING_SQL).bind(id).first<{ avg: number | null; n: number }>();
-  const items = await c.env.DB.prepare(SHOP_REVIEWS_SQL).bind(id).all();
-  return c.json({ avg: stats?.n ? Number(stats.avg) : null, count: Number(stats?.n || 0), items: items.results });
+  return c.json(result.results.map(r => decode<Order>(r)));
 });
 async function changeStatus(env: WorkerEnv, order: Order, status: string, ctx?: { waitUntil(promise: Promise<unknown>): void }) {
   if (!Object.hasOwn(statusNames, status)) throw new Error('invalid_status');

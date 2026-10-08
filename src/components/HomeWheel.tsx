@@ -4,7 +4,7 @@ import { ArrowLeft, ArrowRight, ArrowUpRight, Check, Clock3, Flower2, Heart, Lay
 import type { CartItem, Catalog, Product } from '../types';
 import { haptic, money } from '../lib/api';
 import { Dialog } from './Dialog';
-import { sampleTint, type Tint } from './HomeFeed';
+import { sampleTint, type Tint } from '../lib/tint';
 
 const people = [
   { id: '', label: 'Hammasi' }, { id: 'ona', label: 'Onamga' }, { id: 'rafiqa', label: 'Rafiqamga' },
