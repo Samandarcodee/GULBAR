@@ -18,8 +18,8 @@ Loginni bloklash do‘konni katalogdan yashirmaydi; kerak bo‘lsa do‘konni ha
 
 1. `/merchant` sahifasida login va vaqtinchalik parol bilan kiradi.
 2. O‘ziga yangi parol qo‘yadi. Admin dastlabki vaqtinchalik paroldan keyin bu parolni ko‘ra olmaydi.
-3. **Gullar va narxlar → Gul qo‘shish** orqali nom, tavsif, kategoriya, narx, qoldiq va rasm havolasini kiritadi.
-   Rasm hozir HTTPS havola bilan qo‘shiladi; fayl yuklash yo‘q.
+3. **Gullar va narxlar → Gul qo‘shish** orqali nom, tavsif, kategoriya, narx, qoldiq va rasm kiritadi.
+   Rasm telefon galereyasidan tanlanadi (1–5 ta, birinchisi asosiy); HTTPS havola ixtiyoriy va faqat rasmga olib boradigan bo‘lishi kerak. Batafsil: `docs/photo-upload.md`.
 4. Buyurtmalar faqat shu do‘konning panelida ko‘rinadi. Egasi qabul qiladi, yo‘lga chiqqanini belgilaydi va yetkazilganini tasdiqlaydi.
 5. Bekor qilingan buyurtma gullari qoldiqqa bir marta qaytadi. Egasi mijozga telefon orqali sababini tushuntiradi.
 

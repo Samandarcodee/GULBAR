@@ -141,6 +141,23 @@
 .extra-add { position: relative; display: grid; place-items: center; align-content: center; gap: 4px; width: 76px; height: 92px; border: 1.5px dashed var(--line); border-radius: 12px; font-size: 12px; color: var(--muted); cursor: pointer; transition: border-color .2s, color .2s; }
 .extra-add:hover { border-color: var(--text); color: var(--text); }
 .extra-add input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+.extra-add:focus-within { outline: 3px solid #bf617e; outline-offset: 3px; }
+/* with no photo yet the add button is the one obvious thing to press: full width, one line */
+.extra-add.first { width: 100%; height: 60px; grid-auto-flow: column; justify-content: center; gap: 10px; border-color: var(--text); color: var(--text); font-size: 15px; font-weight: 500; }
+.extra-thumb .main-badge { position: absolute; left: 4px; bottom: 4px; padding: 2px 8px; border-radius: 999px; background: #000b; color: #fff; font-size: 11px; font-weight: 600; }
+.extra-thumb button::after { content: ''; position: absolute; inset: -8px; } /* a 44 px touch target around the small × */
+.extra-thumb button:disabled { opacity: .5; }
+/* a picture whose address does not open: a quiet flower icon instead of the browser's broken-image mark */
+.photo-missing { display: grid; place-items: center; flex-shrink: 0; border-radius: 12px; background: var(--soft); color: var(--muted); }
+.extra-thumb .photo-missing { width: 100%; height: 100%; }
+.panel-view .merchant-products .photo-missing { width: 76px; height: 92px; }
+@media (max-width: 520px) { .panel-view .merchant-products .photo-missing { width: 70px; height: 84px; } }
+.field-error-text { margin: 10px 0 0; font-size: 13px; line-height: 1.45; color: var(--error, #a42639); }
+.photo-link { margin-top: 12px; font-size: 13px; }
+.photo-link summary { display: flex; align-items: center; min-height: 44px; cursor: pointer; color: var(--muted); }
+.photo-link-row { display: flex; gap: 8px; }
+.photo-link-row input { flex: 1; min-width: 0; min-height: 48px; padding: 0 12px; border: 1.5px solid var(--line); border-radius: 12px; background: var(--surface); color: var(--text); font-size: 16px; }
+.photo-link-row .secondary { min-height: 48px; padding: 0 16px; }
 
 /* bottom sheets on phones should span the full width (the browser's default dialog max-width left a gap) */
 @media (max-width: 760px) { .dialog { max-width: 100%; } }

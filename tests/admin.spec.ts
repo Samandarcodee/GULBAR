@@ -48,8 +48,8 @@ test('owner adds a shop, merchant changes password, adds a flower and processes 
   await dialog.getByLabel('Narxi (so‘m)', { exact: true }).fill('150000');
   await dialog.getByLabel('Mavjud soni', { exact: true }).fill('5');
   await page.setViewportSize({ width: 390, height: 844 });
-  await dialog.getByLabel('Telefondan rasm tanlash', { exact: true }).setInputFiles(resolve('public/images/pink-bouquet.jpg'));
-  await expect(dialog.getByAltText('Tanlangan gul rasmi')).toBeVisible();
+  await dialog.getByLabel('Galereyadan rasm tanlash', { exact: true }).setInputFiles(resolve('public/images/pink-bouquet.jpg'));
+  await expect(dialog.getByAltText('Asosiy rasm')).toBeVisible();
   await expect(dialog.getByRole('button', { name: 'Saqlash', exact: true })).toBeEnabled();
   await page.screenshot({ path: 'test-results/gulbar-gallery-mobile.png', fullPage: true });
   await dialog.getByRole('button', { name: 'Saqlash', exact: true }).click();
