@@ -3,7 +3,7 @@
 .home-view.home-wheel {
   --bg: #f4efe9; --surface: #fff; --text: #17120f; --muted: #6a625c; --line: #00000018; --soft: #00000010;
   --brand: #17120f; --brand-strong: #17120f; --on-brand: #fff; --rose-soft: #e9e3dc; --kraft: #d9b987; --kraft-deep: #a9824a;
-  --display: 'Instrument Serif', Georgia, serif; --body: 'Onest', 'DM Sans', sans-serif;
+  --display: 'Manrope', sans-serif; --body: 'DM Sans', sans-serif;
   overflow-x: clip; transition: --bg 1.2s ease;
 }
 :root[data-theme=dark] .home-view.home-wheel {

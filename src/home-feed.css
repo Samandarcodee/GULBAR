@@ -6,7 +6,7 @@
   --bg: #fbfbfa; --surface: #fff; --text: #12100e; --muted: #6b6560; --line: #e7e4df; --soft: #efede9;
   --brand: #12100e; --brand-strong: #12100e; --on-brand: #fff; --rose-soft: #ece9e4;
   --kraft: #d9b987; --kraft-deep: #a9824a; --tint-lum: 80%;
-  --display: 'Syne', 'Manrope', sans-serif; --body: 'Onest', 'DM Sans', sans-serif;
+  --display: 'Manrope', sans-serif; --body: 'DM Sans', sans-serif;
   transition: --bg 1.4s ease;
 }
 :root[data-theme=dark] .home-view.home-feed {
@@ -73,7 +73,7 @@
   clip-path: polygon(20% 0, 80% 0, 100% 14%, 100% 100%, 0 100%, 0 14%);
   -webkit-mask: radial-gradient(circle at 50% 17px, transparent 6px, #000 6.6px); mask: radial-gradient(circle at 50% 17px, transparent 6px, #000 6.6px); }
 .gf-tag small { display: block; font-size: 9px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; opacity: .7; }
-.gf-tag strong { display: block; font-family: 'Caveat', cursive; font-size: 33px; font-weight: 700; line-height: .95; margin: 3px 0 1px; font-variant-numeric: lining-nums; white-space: nowrap; }
+.gf-tag strong { display: block; font-family: 'Manrope', sans-serif; font-size: 26px; font-weight: 800; line-height: .95; margin: 3px 0 1px; font-variant-numeric: lining-nums; white-space: nowrap; }
 
 .gf-info { padding: 20px 2px 0; }
 .gf-nw { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }

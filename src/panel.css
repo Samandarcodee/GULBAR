@@ -1,4 +1,4 @@
-/* Admin and shop-owner panels share the quiet look of the minimal home: Onest + Fraunces, ink on paper, 12–16px radii. */
+/* Admin and shop-owner panels share the quiet look of the minimal home: DM Sans + Manrope, ink on paper, 12–16px radii. */
 .panel-view { --r: 12px; --out: cubic-bezier(.22, 1, .36, 1); }
 .panel-view .merchant { padding-top: 12px; }
 .panel-view .page-heading { margin: 14px 0 22px; }
