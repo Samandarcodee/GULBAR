@@ -3,7 +3,7 @@
 .home-view.home-minimal {
   --bg: #fcfcfb; --surface: #fff; --text: #171614; --muted: #8b8782; --line: #ebe9e5; --soft: #f4f2ef;
   --brand: #171614; --brand-strong: #171614; --on-brand: #fff; --rose-soft: #f1efec;
-  --display: 'Fraunces', Georgia, serif; --body: 'Onest', 'DM Sans', sans-serif;
+  --display: 'Manrope', sans-serif; --body: 'DM Sans', sans-serif;
   font-family: var(--body); overflow-x: clip;
 }
 :root[data-theme=dark] .home-view.home-minimal {

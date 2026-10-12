@@ -3,7 +3,7 @@
 .home-view {
   --bg: #f6f7f5; --surface: #fff; --text: #0f1b1a; --muted: #556361; --line: #dce2de; --soft: #e3efee;
   --brand: #0a747d; --brand-strong: #065860; --on-brand: #fff; --rose-soft: #e8eeeb; --error: #a42639;
-  --display: 'Bricolage Grotesque', 'Manrope', sans-serif; --body: 'Onest', 'DM Sans', sans-serif;
+  --display: 'Manrope', sans-serif; --body: 'DM Sans', sans-serif;
   --r: 12px; --out: cubic-bezier(.22, 1, .36, 1);
   min-height: 100dvh; background: var(--bg); color: var(--text); font-family: var(--body);
 }
